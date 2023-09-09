@@ -1,0 +1,30 @@
+[project]
+name = "clicksearch"
+version = "0.1"
+description = "Framework for CLI applications that filter data streams"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {file = "LICENSE"}
+keywords = ["click"]
+authors = [
+  {name = "Petter Nyström", email = "jimorie@gmail.com" }
+]
+maintainers = [
+  {name = "Petter Nyström", email = "jimorie@gmail.com" }
+]
+dependencies = [
+  "click==8.1.6"
+]
+
+[project.optional-dependencies]
+dev = ["ruff", "mypy", "black", "twine", "pip"]
+
+[project.urls]
+"Homepage" = "https://github.com/jimorie/clicksearch"
+
+[tool.setuptools]
+package-data = {}
+
+[build-system]
+requires = ["setuptools>=43.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
