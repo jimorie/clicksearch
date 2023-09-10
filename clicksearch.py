@@ -41,12 +41,12 @@ class FileReader(ReaderBase):
 
     @staticmethod
     def filenames(options: dict) -> Iterable[str]:
-        """Return filenames in `options["file"]`."""
+        """Returns the filenames in `options`."""
         return options.get("file", [])
 
     def files(self, options: dict) -> Iterable[IO]:
         """
-        Yield file handles for the file names in `self.filenames`. Raises
+        Yields file handles for the file names in `self.filenames`. Raises
         variants of `OSError` if a file name cannot be opened for reading.
         """
         try:
@@ -70,7 +70,7 @@ class JsonReader(FileReader):
     """
 
     def read(self, options: dict) -> Iterable[Mapping]:
-        """Yield items from files in `self.files`."""
+        """Yields items from files in `self.files`."""
         for fd in self.files(options):
             doc = json.load(fd)
             for item in doc:
@@ -84,7 +84,7 @@ class JsonLineReader(FileReader):
     """
 
     def read(self, options: dict) -> Iterable[Mapping]:
-        """Yield items from files in `self.files`."""
+        """Yields items from files in `self.files`."""
         for fd in self.files(options):
             for line in fd:
                 yield json.loads(line.rstrip())
@@ -140,7 +140,7 @@ class ClickSearchChoice(click.ParamType):
         self, optarg: Any, param: click.Parameter | None, ctx: click.Context | None
     ) -> Any:
         """
-        Convert the option argument `optarg` to the first matching choice in
+        Converts the option argument `optarg` to the first matching choice in
         `self.choices`. If no choice matches, then print an error message and
         exit.
         """
@@ -171,7 +171,7 @@ class ClickSearchField(ClickSearchChoice):
         self, optarg: Any, param: click.Parameter | None, ctx: click.Context | None
     ) -> Any:
         """
-        Convert the `optarg` field name to the corresponding `FieldBase`
+        Converts the `optarg` field name to the corresponding `FieldBase`
         instance.
         """
         fieldname = super().convert(optarg, param, ctx)
@@ -194,7 +194,7 @@ class ModelBase:
 
     @classmethod
     def make_command(cls) -> click.Command:
-        """Return the `click.Command` object used to run the CLI."""
+        """Returns the `click.Command` object used to run the CLI."""
         cmdobj = cls.command_cls(cls.__cmd_name__, callback=cls.main, model=cls)
         cmdobj.params.append(cls.make_argument())
         cmdobj.params.extend(cls.make_options())
@@ -204,7 +204,7 @@ class ModelBase:
 
     @classmethod
     def make_options(cls) -> Iterable[click.Option]:
-        """Yield all standard options offered by the CLI."""
+        """Yields all standard options offered by the CLI."""
         yield click.Option(["--verbose", "-v"], count=True, help="Show more data.")
         yield click.Option(
             ["--brief"],
@@ -243,7 +243,7 @@ class ModelBase:
 
     @classmethod
     def make_argument(cls) -> click.Argument:
-        """Return the `click.Argument` object used to handle non-option parameters."""
+        """Returns the `click.Argument` object used to handle non-option parameters."""
         return cls.argument_cls(["file"], nargs=-1)
 
     @classmethod
@@ -251,7 +251,7 @@ class ModelBase:
         cls, ctx: click.Context, opt: ClickSearchOption, filterarg: Any
     ) -> Any:
         """
-        Register the use of a filter option `opt` with `filterarg`. If any
+        Registers the use of a filter option `opt` with `filterarg`. If any
         callback was registered on the option, it gets called from here.
         """
         if filterarg is not None:
@@ -264,8 +264,8 @@ class ModelBase:
     @classmethod
     def register_field(cls, field: FieldBase):
         """
-        Register a `field` assigned to this `cls`. This registers all the
-        options defined for `field`.
+        Registers a `field` assigned to this `cls` and all the options defined
+        for `field`.
         """
         fieldoptions = cls.fields[field]
         for filter_func, opt_kwargs in field.resolve_fieldfilters():
@@ -334,7 +334,6 @@ class ModelBase:
 
         # Print each item
         for item in items:
-
             # Count stuff
             item_count += 1
             for field in options["count"]:
@@ -369,7 +368,7 @@ class ModelBase:
     @classmethod
     def preprocess_filterdata(cls, options: dict):
         """
-        Pre-process data in `cls.filterdata` after we have received all
+        Pre-processes data in `cls.filterdata` after we have received all
         options. Actual pre-processing is delegated to
         `FieldBase.preprocess_filterarg`.
         """
@@ -382,7 +381,7 @@ class ModelBase:
 
     @classmethod
     def filter_items(cls, items: Iterable[Mapping], options: dict) -> Iterable[Mapping]:
-        """Yield the items that pass `cls.test_item`."""
+        """Yields the items that pass `cls.test_item`."""
         for item in items:
             if cls.test_item(item, options):
                 yield item
@@ -390,7 +389,7 @@ class ModelBase:
     @classmethod
     def test_item(cls, item: Mapping, options: dict) -> bool:
         """
-        Return `True` if `item` passes all filter options used, otherwise
+        Returns `True` if `item` passes all filter options used, otherwise
         `False`.
         """
         for field, filterargs in cls.filterdata.items():
@@ -405,7 +404,7 @@ class ModelBase:
 
     @classmethod
     def sort_items(cls, items: Iterable[Mapping], options: dict) -> Iterable[Mapping]:
-        """Return `items` sorted according to the --group and --sort `options`."""
+        """Returns `items` sorted according to the --group and --sort `options`."""
         sort_fields = options["group"] + options["sort"]
         if sort_fields:
 
@@ -418,8 +417,9 @@ class ModelBase:
     @classmethod
     def adjust_verbose(cls, items, options):
         """
-        Adjust the verbosity based on number of `items` and `options`. Return
-        `items` again (since we may have to tamper with when an iterator).
+        Adjusts the verbosity based on number of `items` and `options`.
+        Returns `items` again (since we may have to tamper with when an
+        iterator).
         """
         if options["brief"]:
             options["verbose"] = 0
@@ -445,7 +445,7 @@ class ModelBase:
 
     @classmethod
     def collect_visible_fields(cls, options):
-        """Yield all fields that should be considered for printing."""
+        """Yields all fields that should be considered for printing."""
         for field in cls.fields:
             if options["verbose"] < field.verbosity:
                 continue
@@ -453,7 +453,7 @@ class ModelBase:
 
     @classmethod
     def print_brief(cls, fields: Iterable[FieldBase], item: Mapping, options: dict):
-        """Print a one-line representation of `item`."""
+        """Prints a one-line representation of `item`."""
         first = True
         for field in fields:
             try:
@@ -471,7 +471,7 @@ class ModelBase:
 
     @classmethod
     def print_long(cls, fields: list[FieldBase], item: Mapping, options: dict):
-        """Print a multi-line representation of `item`."""
+        """Prints a multi-line representation of `item`."""
         first = True
         for field in fields:
             try:
@@ -488,7 +488,7 @@ class ModelBase:
 
     @classmethod
     def print_counts(cls, counts: dict[FieldBase, dict[str, int]], item_count: int):
-        """Print `counts` breakdowns."""
+        """Prints `counts` breakdowns."""
         for field, breakdown in counts.items():
             click.secho(f"[ {field.fmtname} counts ]", fg="green", bold=True)
             click.echo()
@@ -561,8 +561,8 @@ class FieldBase(click.ParamType):
 
     def __set_name__(self, owner: type[ModelBase], name: str):
         """
-        Register this `FieldBase` instance on a `ModelBase` class under the given
-        `name`.
+        Registers this `FieldBase` instance on a `ModelBase` class under the
+        given `name`.
         """
         if self.key is None:
             self.key = name
@@ -577,7 +577,7 @@ class FieldBase(click.ParamType):
     @classmethod
     def register_filter(cls, filter_func: Callable, opt_kwargs: dict):
         """
-        Register a `filter_func` with `Option` kwargs `opt_kwargs`. Called by
+        Registers a `filter_func` with `Option` kwargs `opt_kwargs`. Called by
         the `fieldfilter` decorator.
         """
         cls.fieldfilters[cls].append((filter_func, opt_kwargs))
@@ -585,7 +585,7 @@ class FieldBase(click.ParamType):
     @classmethod
     def resolve_fieldfilters(cls) -> Iterable[tuple[Callable, dict]]:
         """
-        Generate all filters defined with the `fieldfilter` decorator on `cls`
+        Yields all filters defined with the `fieldfilter` decorator on `cls`
         and its ancestors. Overloaded filters are only yielded once.
         """
         seen = set()
@@ -601,7 +601,7 @@ class FieldBase(click.ParamType):
         self, filterarg: Any, param: click.Parameter | None, ctx: click.Context | None
     ) -> Any:
         """
-        Convert an option argument `optarg` for this field and return the new
+        Converts an option argument `optarg` for this field and return the new
         value. This calls `validate` and handles any `TypeError` or
         `ValueError` raised by re-raising a `click.BadParameter` exception.
         """
@@ -611,7 +611,7 @@ class FieldBase(click.ParamType):
             raise click.BadParameter(str(filterarg), ctx=ctx, param=param)
 
     def format_opt_kwargs(self, opt_kwargs: dict) -> dict:
-        """Resolve format placeholders in all `opt_kwargs`."""
+        """Resolves format placeholders in all `opt_kwargs`."""
         if "param_decls" in opt_kwargs:
             opt_kwargs["param_decls"] = [
                 self.format_opt_arg(arg) for arg in opt_kwargs["param_decls"]
@@ -621,22 +621,22 @@ class FieldBase(click.ParamType):
         return opt_kwargs
 
     def format_opt_arg(self, arg: str) -> str:
-        """Resolve format placeholders in the single `arg`."""
+        """Resolves format placeholders in the single `arg`."""
         return arg.format(optname=self.optname, helpname=self.helpname)
 
     def preprocess_filterarg(
         self, filterarg: Any, opt: click.Parameter, options: dict
     ) -> Any:
-        """Preprocess a `filterarg` for an `opt` used as a filter for this field."""
+        """Pre-processes a `filterarg` for an `opt` used as a filter for this field."""
         return filterarg
 
     def validate(self, value: Any) -> Any:
-        """Validate `value` and return a possibly converted value."""
+        """Validates `value` and return a possibly converted value."""
         return value
 
     def fetch(self, item: Mapping, default: Any | type = MissingField) -> Any:
         """
-        Return this field's value in `item`.
+        Returns this field's value in `item`.
         * If `item` has no value for this field and `default` is given, then
           `default` is returned instead. Otherwise a `MissingField` exception
           is raised.
@@ -657,8 +657,8 @@ class FieldBase(click.ParamType):
 
     def sortkey(self, item: Mapping) -> Any:
         """
-        Return a comparable-type version of this field's value in `item`, used
-        for sorting.
+        Returns a comparable-type version of this field's value in `item`,
+        used for sorting.
         """
         return self.fetch(item)
 
@@ -668,7 +668,7 @@ class FieldBase(click.ParamType):
 
     def format_long(self, value: Any) -> str:
         """
-        Return a long (single line) formatted version of `value` for this
+        Returns a long (single line) formatted version of `value` for this
         field.
         """
         value = self.style(value)
@@ -677,13 +677,13 @@ class FieldBase(click.ParamType):
         return f"{self.fmtname}: {value}"
 
     def style(self, value: Any) -> str:
-        """Return a styled `value` for this field."""
+        """Returns a styled `value` for this field."""
         if self.fg:
             return click.style(value, fg=self.fg, bold=self.bold)
         return value
 
     def count(self, item: Mapping, counts: collections.Counter):
-        """Increment the `counts` count of this field's value in `item` by 1."""
+        """Increments the `counts` count of this field's value in `item` by 1."""
         try:
             counts[self.format_brief(self.fetch(item))] += 1
         except MissingField:
@@ -694,14 +694,48 @@ class Number(FieldBase):
     """Class for defining a numeric field on a model."""
 
     name = "NUMBER"
+    operators = [
+        ("==", operator.eq),
+        ("!=", operator.ne),
+        ("!", operator.ne),
+        ("<=", operator.le),
+        ("<", operator.lt),
+        (">=", operator.ge),
+        (">", operator.gt),
+    ]
 
     def __init__(self, *args, specials: list[str] | None, **kwargs):
         super().__init__(*args, **kwargs)
         self.specials = specials
 
+    def convert(
+        self, filterarg: Any, param: click.Parameter | None, ctx: click.Context | None
+    ) -> Any:
+        """
+        Converts `filterarg` to a function that implements the comparison. If
+        `filterarg` is just a legal value, the default comparison is
+        equality.
+        """
+        filterarg = filterarg.strip()
+        for operator_prefix, op in self.operators:
+            if filterarg.startswith(operator_prefix):
+                filterarg = filterarg[len(operator_prefix) :].lstrip()
+                break
+        else:
+            op = operator.eq
+        filterarg = super(Number, self).convert(filterarg, param, ctx)
+
+        def compare(x):
+            try:
+                return op(x, filterarg)
+            except TypeError:
+                return False
+
+        return compare
+
     def validate(self, value: Any) -> Any:
         """
-        Convert `value` to an `int` or `float` and return it.
+        Converts `value` to an `int` or `float` and return it.
         * If `value` is `None` or if it matches any of the `specials` defined
           for this field, then `value` is returned without conversion.
         * If `value` cannot be converted, a `TypeError` or `ValueError` is
@@ -719,7 +753,7 @@ class Number(FieldBase):
 
     def sortkey(self, item: Mapping) -> Any:
         """
-        Return a comparable-type version of this field's value in `item`, used
+        Returns a comparable-type version of this field's value in `item`, used
         for sorting. For `Number` objects this is guaranteed to be an `int`
         or `float`.
         """
@@ -734,14 +768,17 @@ class Number(FieldBase):
     @fieldfilter(
         "--{optname}", help="Filter on matching {helpname} (number comparison)."
     )
-    def filter_number(self, arg: Any, value: Any, options: dict) -> bool:
-        """Return `True` if `arg` equals `value`, otherwise `False`."""
+    def filter_number(self, arg: Callable, value: Any, options: dict) -> bool:
+        """
+        Returns the result of calling `arg` with `value`. Where `arg` is the
+        comparator function provided by `convert`.
+        """
         if value is None:
             return False
-        return arg == value
+        return arg(value)
 
     def format_brief(self, value: Any) -> str:
-        """Return a brief formatted version of `value` for this field."""
+        """Returns a brief formatted version of `value` for this field."""
         if value is None:
             return f"No {self.fmtname}"
         return f"{value} {self.fmtname}"
@@ -756,8 +793,8 @@ class String(FieldBase):
         self, filterarg: Any, opt: click.Parameter, options: dict
     ) -> Any | re.Pattern:
         """
-        Pre-process `filterarg` for comparison against `String` field values,
-        depending on the `options` used.
+        Pre-processes `filterarg` for comparison against `String` field
+        values, depending on the `options` used.
         """
         if not options["case"]:
             filterarg = filterarg.lower()
@@ -772,7 +809,7 @@ class String(FieldBase):
 
     def sortkey(self, item: Mapping) -> Any:
         """
-        Return a comparable-type version of this field's value in `item`, used
+        Returns a comparable-type version of this field's value in `item`, used
         for sorting. For `String` objects this is guaranteed to be of type
         `str`.
         """
@@ -784,7 +821,7 @@ class String(FieldBase):
     @fieldfilter("--{optname}", help="Filter on matching {helpname}.")
     def filter_text(self, arg: Any, value: Any, options: dict) -> bool:
         """
-        Return `True` if `arg` matches `value`, depending on `options`,
+        Returns `True` if `arg` matches `value`, depending on `options`,
         otherwise `False`.
         """
         if not options["case"]:
@@ -798,7 +835,7 @@ class String(FieldBase):
     @fieldfilter("--{optname}-isnt", help="Filter on non-matching {helpname}")
     def filter_text_isnt(self, arg: Any, value: Any, options: dict) -> bool:
         """
-        Return `False` if `arg` matches `value`, depending on `options`,
+        Returns `False` if `arg` matches `value`, depending on `options`,
         otherwise `True`.
         """
         return not self.filter_text(self, arg, value, options)
@@ -810,12 +847,12 @@ class Flag(FieldBase):
     name = "FLAG"
 
     def validate(self, value: Any) -> Any:
-        """Convert `value` to `True` or `False` and return it."""
+        """Converts `value` to `True` or `False` and return it."""
         return value in (1, "1", True)
 
     def sortkey(self, item: Mapping) -> Any:
         """
-        Return a comparable-type version of this field's value in `item`, used
+        Returns a comparable-type version of this field's value in `item`, used
         for sorting. For `Flag` objects this is the inverse boolean of its
         value so that truthy values are ordered first.
         """
@@ -823,21 +860,21 @@ class Flag(FieldBase):
 
     @fieldfilter("--{optname}", is_flag=True, help="Filter on {helpname}.")
     def filter_true(self, arg: Any, value: Any, options: dict) -> bool:
-        """Return `value`. :)"""
+        """Returns `value`. :)"""
         return value
 
     @fieldfilter("--non-{optname}", is_flag=True, help="Filter on non-{helpname}.")
     def filter_false(self, arg: Any, value: Any, options: dict) -> bool:
-        """Return the inversion of `value`."""
+        """Returns the inversion of `value`."""
         return not self.filter_true(arg, value, options)
 
     def format_brief(self, value: Any) -> str:
-        """Return a brief formatted version of `value` for this field."""
+        """Returns a brief formatted version of `value` for this field."""
         return str(self.fmtname) if value else f"Non-{self.fmtname}"
 
     def format_long(self, value: Any) -> str:
         """
-        Return a long (single line) formatted version of `value` for this
+        Returns a long (single line) formatted version of `value` for this
         field.
         """
         return f"{self.fmtname}: {'Yes' if value else 'No'}"
@@ -864,7 +901,7 @@ class Choice(String, ClickSearchChoice):
         self, filterarg: Any, opt: click.Parameter, options: dict
     ) -> Any:
         """
-        Return `filterarg` as-is since `Choice` field values are expected to
+        Returns `filterarg` as-is since `Choice` field values are expected to
         exactly match the defined set of `choices`.
         """
         return filterarg
@@ -873,7 +910,7 @@ class Choice(String, ClickSearchChoice):
         self, optarg: Any, param: click.Parameter | None, ctx: click.Context | None
     ) -> Any:
         """
-        Convert the option argument `optarg` using the
+        Converts the option argument `optarg` using the
         `ClickSearchChoice.convert` method.
         """
         return ClickSearchChoice.convert(self, optarg, param, ctx)
@@ -896,14 +933,17 @@ class SeparatedString(String):
         self.separator = separator
 
     def parts(self, value: str) -> Iterable[str]:
-        """Yield each individual part of the `SeparatedString`."""
+        """Yields each individual part of the `SeparatedString`."""
         for part in value.split(self.separator):
             part = part.strip()
             if part:
                 yield part
 
     def count(self, item: Mapping, counts: collections.Counter):
-        """Count each part in the `SeparatedString` individually."""
+        """
+        Increments the count of each part in the `SeparatedString`
+        individually.
+        """
         try:
             for part in self.parts(self.fetch(item)):
                 counts[part] += 1
@@ -913,7 +953,7 @@ class SeparatedString(String):
     @fieldfilter("--{optname}", help="Filter on matching {helpname}.")
     def filter_text(self, arg: Any, value: Any, options: dict) -> bool:
         """
-        Return `True` if `arg` matches any part of the separated `value`,
+        Returns `True` if `arg` matches any part of the separated `value`,
         depending on `options`, otherwise `False`.
         """
         return any(
