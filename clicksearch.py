@@ -205,6 +205,7 @@ class ModelBase:
     @classmethod
     def make_options(cls) -> Iterable[click.Option]:
         """Yields all standard options offered by the CLI."""
+        fieldmap = {field.optname: field for field in cls.fields}
         yield click.Option(["--verbose", "-v"], count=True, help="Show more data.")
         yield click.Option(
             ["--brief"],
@@ -218,7 +219,9 @@ class ModelBase:
         yield click.Option(
             ["--regex"], is_flag=True, help="Use regular rexpressions when filtering."
         )
-        fieldmap = {field.optname: field for field in cls.fields}
+        yield click.Option(
+            ["--inclusive"], is_flag=True, help="Use regular rexpressions when filtering."
+        )
         yield click.Option(
             ["--sort"],
             help="Sort results by given field.",
@@ -254,11 +257,10 @@ class ModelBase:
         Registers the use of a filter option `opt` with `filterarg`. If any
         callback was registered on the option, it gets called from here.
         """
-        if filterarg is not None:
+        if len(filterarg):
             if opt.user_callback:
                 filterarg = opt.user_callback(ctx, opt, filterarg)
-            if opt.field:
-                cls.filterdata[opt.field].append((opt, filterarg))
+            cls.filterdata[opt.field].append((opt, filterarg))
         return filterarg
 
     @classmethod
@@ -278,6 +280,7 @@ class ModelBase:
                     user_callback=callback,
                     callback=cls.filter_callback,
                     field=field,
+                    multiple=True,
                     **new_kwargs,
                 )
             )
@@ -372,11 +375,14 @@ class ModelBase:
         options. Actual pre-processing is delegated to
         `FieldBase.preprocess_filterarg`.
         """
-        for field, filterargs in cls.filterdata.items():
-            for i, (opt, filterarg) in enumerate(filterargs):
-                filterargs[i] = (
+        for field, fieldfilters in cls.filterdata.items():
+            for i, (opt, filterargs) in enumerate(fieldfilters):
+                fieldfilters[i] = (
                     opt,
-                    field.preprocess_filterarg(filterarg, opt, options),
+                    tuple(
+                        field.preprocess_filterarg(filterarg, opt, options)
+                        for filterarg in filterargs
+                    )
                 )
 
     @classmethod
@@ -392,14 +398,20 @@ class ModelBase:
         Returns `True` if `item` passes all filter options used, otherwise
         `False`.
         """
-        for field, filterargs in cls.filterdata.items():
+        for field, fieldfilters in cls.filterdata.items():
             try:
                 value = field.fetch(item)
             except MissingField:
                 return False
-            for opt, filterarg in filterargs:
-                if not opt.filter_func(opt.field, filterarg, value, options):
-                    return False
+            any_or_all = any if field.inclusive or options["inclusive"] else all
+            if not any_or_all(
+                any_or_all(
+                    opt.filter_func(opt.field, filterarg, value, options)
+                    for filterarg in filterargs
+                )
+                for opt, filterargs in fieldfilters
+            ):
+                return False
         return True
 
     @classmethod
@@ -478,6 +490,8 @@ class ModelBase:
                 value = field.fetch(item)
             except MissingField:
                 continue
+            if value in (None, ""):
+                continue
             if first:
                 value = click.style(value, fg="cyan", bold=True)
                 first = False
@@ -536,6 +550,7 @@ class FieldBase(click.ParamType):
         self,
         default: Any = None,
         nullable: bool = False,
+        inclusive: bool = False,
         key: str | None = None,
         optname: str | None = None,
         helpname: str | None = None,
@@ -548,6 +563,7 @@ class FieldBase(click.ParamType):
     ):
         self.default = default
         self.nullable = nullable
+        self.inclusive = inclusive
         self.key = key
         self.optname = optname
         self.helpname = helpname
@@ -982,14 +998,16 @@ class Test(ModelBase):
             "Syndicate": None,
             "The Agency": None,
             "Yog-Sothoth": None,
-        }
+        },
+        inclusive=True,
     )
     cardtype = Choice(
+        choices=["Character", "Event", "Story", "Support"],
         key="type",
         helpname="card type",
         typename="CARD TYPE",
         optname="type",
-        choices=["Character", "Event", "Story", "Support"],
+        inclusive=True,
     )
     cost = Number(specials=["X"])
     restricted = Flag(verbosity=2)
