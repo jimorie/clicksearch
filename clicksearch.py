@@ -550,6 +550,7 @@ class FieldBase(click.ParamType):
         default: Any = None,
         nullable: bool = False,
         inclusive: bool = False,
+        skip_filters: Iterable[Callable] | None = None,
         key: str | None = None,
         optname: str | None = None,
         helpname: str | None = None,
@@ -563,6 +564,7 @@ class FieldBase(click.ParamType):
         self.default = default
         self.nullable = nullable
         self.inclusive = inclusive
+        self.skip_filters = skip_filters
         self.key = key
         self.optname = optname
         self.helpname = helpname
@@ -597,19 +599,21 @@ class FieldBase(click.ParamType):
         """
         cls.fieldfilters[cls].append((filter_func, opt_kwargs))
 
-    @classmethod
-    def resolve_fieldfilters(cls) -> Iterable[tuple[Callable, dict]]:
+    def resolve_fieldfilters(self) -> Iterable[tuple[Callable, dict]]:
         """
-        Yields all filters defined with the `fieldfilter` decorator on `cls`
-        and its ancestors. Overloaded filters are only yielded once.
+        Yields all filters defined with the `fieldfilter` decorator on this
+        field and its ancestors. Overloaded filters are only yielded once.
         """
         seen = set()
-        for ancestor in cls.__mro__:
+        for ancestor in self.__class__.__mro__:
             if not issubclass(ancestor, FieldBase):
                 break
-            for filter_func, opt_kwargs in cls.fieldfilters[ancestor]:
-                if filter_func.__name__ not in seen:
-                    yield filter_func, opt_kwargs
+            for filter_func, opt_kwargs in self.fieldfilters[ancestor]:
+                if self.skip_filters and filter_func in self.skip_filters:
+                    continue
+                if filter_func.__name__ in seen:
+                    continue
+                yield filter_func, opt_kwargs
                 seen.add(filter_func.__name__)
 
     def convert(
@@ -725,7 +729,7 @@ class Number(FieldBase):
         (">", operator.gt),
     ]
 
-    def __init__(self, *args, specials: list[str] | None, **kwargs):
+    def __init__(self, *args, specials: list[str] | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         self.specials = specials
 
@@ -983,6 +987,47 @@ class SeparatedString(String):
         )
 
 
+class ChallengeIcons(Number):
+    icons = ("terror", "combat", "arcane", "investigation")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, skip_filters=[Number.filter_number], **kwargs)
+
+    def fetch(self, item: Mapping, default: Any | type = MissingField) -> tuple[int, int, int, int]:
+        """Returns all icon values in `item` as a tuple."""
+        return tuple(self.validate(item.get(icon, 0)) for icon in self.icons)
+
+    @fieldfilter("--terror", help="Filter on number of terror icons.")
+    def filter_terror(self, arg: Callable, value: Any, options: dict) -> bool:
+        return self.filter_number(arg, value[0], options)
+
+    @fieldfilter("--combat", help="Filter on number of combat icons.")
+    def filter_combat(self, arg: Callable, value: Any, options: dict) -> bool:
+        return self.filter_number(arg, value[1], options)
+
+    @fieldfilter("--arcane", help="Filter on number of arcance icons.")
+    def filter_arcane(self, arg: Callable, value: Any, options: dict) -> bool:
+        return self.filter_number(arg, value[2], options)
+
+    @fieldfilter("--investigation", help="Filter on number of investigation icons.")
+    def filter_investigation(self, arg: Callable, value: Any, options: dict) -> bool:
+        return self.filter_number(arg, value[3], options)
+
+    def format_value(self, value: tuple[int, int, int, int]) -> str:
+        """Return a string representation of `value`."""
+        terror, combat, arcane, investigation = value
+        return (
+            click.style("T" * terror, fg="green") +
+            click.style("C" * combat, fg="red") +
+            click.style("A" * arcane, fg="magenta") +
+            click.style("I" * investigation, fg="yellow")
+        )
+
+    def format_brief(self, value: Any) -> str:
+        """Returns a brief formatted version of `value` for this field."""
+        return click.style("[", fg="blue") + self.format_value(value) + click.style("]", fg="blue")
+
+
 class Test(ModelBase):
     __cmd_name__ = "Test"
     name = String(standalone=True, fg="cyan", bold=True)
@@ -1015,6 +1060,8 @@ class Test(ModelBase):
         inclusive=True,
     )
     cost = Number(specials=["X"])
+    skill = Number(specials=["X"])
+    icons = ChallengeIcons()
     restricted = Flag(verbosity=2)
     banned = Flag(verbosity=2)
 
