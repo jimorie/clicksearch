@@ -364,7 +364,7 @@ class ModelBase:
             print_func(print_fields, item, options)
 
         # Print breakdown counts
-        if verbose >= 0:
+        if verbose == 0:
             click.echo()
         cls.print_counts(counts, item_count)
 
@@ -490,14 +490,13 @@ class ModelBase:
                 value = field.fetch(item)
             except MissingField:
                 continue
-            if value in (None, ""):
-                continue
             if first:
-                value = click.style(value, fg="cyan", bold=True)
+                value = value and click.style(value, fg="cyan", bold=True)
                 first = False
             else:
                 value = field.format_long(value)
-            click.echo(value)
+            if value:
+                click.echo(value)
         click.echo()
 
     @classmethod
@@ -678,16 +677,22 @@ class FieldBase(click.ParamType):
         """
         return self.fetch(item)
 
+    def format_value(self, value: Any) -> str:
+        """Return a string representation of `value`."""
+        if value is None or value == "":
+            return ""
+        return self.style(str(value))
+
     def format_brief(self, value: Any) -> str:
         """Return a brief formatted version of `value` for this field."""
-        return self.style(value)
+        return self.format_value(value)
 
     def format_long(self, value: Any) -> str:
         """
         Returns a long (single line) formatted version of `value` for this
         field.
         """
-        value = self.style(value)
+        value = self.format_value(value)
         if self.standalone:
             return value
         return f"{self.fmtname}: {value}"
