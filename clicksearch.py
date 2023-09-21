@@ -525,6 +525,8 @@ def fieldfilter(*param_decls, **opt_kwargs):
         def __init__(self, func: Callable):
             self.func = func
             self.opt_kwargs = {"param_decls": param_decls, **opt_kwargs}
+            if "help" not in self.opt_kwargs and func.__doc__:
+                self.opt_kwargs["help"] = func.__doc__
 
         def __set_name__(self, owner: type[FieldBase], name: str):
             owner.register_filter(self.func, self.opt_kwargs)
@@ -853,17 +855,16 @@ class String(FieldBase):
             value = value.lower()
         if options["regex"]:
             return bool(arg.search(value))
+        if arg.startswith("!"):
+            negate = not arg.startswith("!!")
+            arg = arg[1:]
+        else:
+            negate = False
         if options["exact"]:
-            return arg and value and arg == value
-        return value and arg in value
-
-    @fieldfilter("--{optname}-isnt", help="Filter on non-matching {helpname}")
-    def filter_text_isnt(self, arg: Any, value: Any, options: dict) -> bool:
-        """
-        Returns `False` if `arg` matches `value`, depending on `options`,
-        otherwise `True`.
-        """
-        return not self.filter_text(self, arg, value, options)
+            result = value and arg == value
+        else:
+            result = value and arg in value
+        return result ^ negate
 
 
 class Flag(FieldBase):
@@ -997,20 +998,24 @@ class ChallengeIcons(Number):
         """Returns all icon values in `item` as a tuple."""
         return tuple(self.validate(item.get(icon, 0)) for icon in self.icons)
 
-    @fieldfilter("--terror", help="Filter on number of terror icons.")
+    @fieldfilter("--terror")
     def filter_terror(self, arg: Callable, value: Any, options: dict) -> bool:
+        """Filter on number of terror icons."""
         return self.filter_number(arg, value[0], options)
 
-    @fieldfilter("--combat", help="Filter on number of combat icons.")
+    @fieldfilter("--combat")
     def filter_combat(self, arg: Callable, value: Any, options: dict) -> bool:
+        """Filter on number of combat icons."""
         return self.filter_number(arg, value[1], options)
 
-    @fieldfilter("--arcane", help="Filter on number of arcance icons.")
+    @fieldfilter("--arcane")
     def filter_arcane(self, arg: Callable, value: Any, options: dict) -> bool:
+        """Filter on number of arcance icons."""
         return self.filter_number(arg, value[2], options)
 
-    @fieldfilter("--investigation", help="Filter on number of investigation icons.")
+    @fieldfilter("--investigation")
     def filter_investigation(self, arg: Callable, value: Any, options: dict) -> bool:
+        """Filter on number of investigation icons."""
         return self.filter_number(arg, value[3], options)
 
     def format_value(self, value: tuple[int, int, int, int]) -> str:
