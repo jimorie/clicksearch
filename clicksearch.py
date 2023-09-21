@@ -213,6 +213,12 @@ class ModelBase:
             help="Show one line of data, regardless the level of verbose.",
         )
         yield click.Option(
+            ["--show"],
+            help="Show only the given field(s).",
+            multiple=True,
+            type=ClickSearchField(fieldmap),
+        )
+        yield click.Option(
             ["--case"], is_flag=True, help="Use case sensitive filtering."
         )
         yield click.Option(["--exact"], is_flag=True, help="Use exact match filtering.")
@@ -327,7 +333,11 @@ class ModelBase:
             current_group = []
 
         # Collect the fields we are interested in printing
-        print_fields = list(cls.collect_visible_fields(options))
+        if options["show"] and cls.fields:
+            title_field, *_ = cls.fields
+            show_fields = [title_field, *options["show"]]
+        else:
+            show_fields = list(cls.collect_visible_fields(options))
 
         # Set up counter
         item_count = 0
@@ -361,7 +371,7 @@ class ModelBase:
                     current_group = next_group
 
             # Print the item
-            print_func(print_fields, item, options)
+            print_func(show_fields, item, options)
 
         # Print breakdown counts
         if verbose == 0:
