@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import collections
+import inspect
 import itertools
 import json
 import operator
@@ -97,8 +98,46 @@ class ClickSearchCommand(click.Command):
     """
 
     def __init__(self, *args, model: type[ModelBase], **kwargs):
+        if 'help' not in kwargs:
+            kwargs['help'] = model.__doc__
         super().__init__(*args, **kwargs)
         self.model = model
+
+    def format_options(self, ctx: click.Context, formatter: click.HelpFormatter):
+        """
+        Writes separate sections of options and field filters into the
+        `formatter` if they exist.
+        """
+        opts = []
+        fields = []
+        for param in self.get_params(ctx):
+            rv = param.get_help_record(ctx)
+            if rv is not None:
+                if isinstance(param, ClickSearchOption):
+                    fields.append(rv)
+                else:
+                    opts.append(rv)
+
+        if opts:
+            with formatter.section("Options"):
+                formatter.write_dl(opts)
+
+        if fields:
+            with formatter.section("Field filters"):
+                formatter.write_dl(fields)
+
+    def format_epilog(self, ctx: Context, formatter: HelpFormatter) -> None:
+        """Writes the field type help texts, and then the epilog."""
+        types = set(
+            (param.type.get_metavar(), param.type.get_metavar_help())
+            for param in self.get_params(ctx)
+            if param.type and hasattr(param.type, "get_metavar_help") and not param.is_flag
+        )
+        items = sorted((k, v) for k, v in types if k and v)
+        if items:
+            with formatter.section("Where"):
+                formatter.write_dl(items)
+        super().format_epilog(ctx, formatter)
 
 
 class ClickSearchOption(click.Option):
@@ -122,71 +161,15 @@ class ClickSearchOption(click.Option):
         self.user_callback = user_callback
 
 
-class ClickSearchChoice(click.ParamType):
-    """
-    A `ParamType` class that completes the option argument to the first match
-    in a given set of choices.
-    """
-
-    name = "CHOICE"
-
-    def __init__(self, choices: dict[str, str] | Iterable[str]):
-        if isinstance(choices, dict):
-            self.choices = {key.lower(): value or key for key, value in choices.items()}
-        else:
-            self.choices = {choice.lower(): choice for choice in choices}
-
-    def convert(
-        self, optarg: Any, param: click.Parameter | None, ctx: click.Context | None
-    ) -> Any:
-        """
-        Converts the option argument `optarg` to the first matching choice in
-        `self.choices`. If no choice matches, then print an error message and
-        exit.
-        """
-        optarg = optarg.lower()
-        for lowerchoice, choice in self.choices.items():
-            if lowerchoice.startswith(optarg):
-                return choice
-        self.fail(
-            f"Valid choices are: {', '.join(sorted(set(self.choices.values())))}",
-            param=param,
-            ctx=ctx,
-        )
-
-
-class ClickSearchField(ClickSearchChoice):
-    """
-    A `ParamType` class that completes the option argument to one of the
-    `FieldBase` instances defined on the command `model`.
-    """
-
-    name = "FIELD"
-
-    def __init__(self, fieldmap, *args, **kwargs):
-        self.fieldmap = fieldmap
-        super().__init__(fieldmap.keys(), *args, **kwargs)
-
-    def convert(
-        self, optarg: Any, param: click.Parameter | None, ctx: click.Context | None
-    ) -> Any:
-        """
-        Converts the `optarg` field name to the corresponding `FieldBase`
-        instance.
-        """
-        fieldname = super().convert(optarg, param, ctx)
-        return self.fieldmap[fieldname]
-
-
 class ModelBase:
     """Base class for models used to define the data items to operate on."""
 
     __cmd_name__: str
 
-    command_cls = ClickSearchCommand
-    option_cls = ClickSearchOption
-    argument_cls = click.Argument
-    reader_cls = JsonLineReader
+    command_cls: type[ClickSearchCommand] = ClickSearchCommand
+    option_cls: type[ClickSearchOption] = ClickSearchOption
+    argument_cls: type[click.Argument] = click.Argument
+    reader_cls: type[ReaderBase] = JsonLineReader
     fields: dict[FieldBase, list[ClickSearchOption]] = collections.defaultdict(list)
     filterdata: dict[
         FieldBase, list[tuple[ClickSearchOption, Any]]
@@ -214,9 +197,9 @@ class ModelBase:
         )
         yield click.Option(
             ["--show"],
-            help="Show only the given field(s).",
+            help="Show given field only.",
             multiple=True,
-            type=ClickSearchField(fieldmap),
+            type=FieldChoice(fieldmap),
         )
         yield click.Option(
             ["--case"], is_flag=True, help="Use case sensitive filtering."
@@ -232,13 +215,13 @@ class ModelBase:
             ["--sort"],
             help="Sort results by given field.",
             multiple=True,
-            type=ClickSearchField(fieldmap),
+            type=FieldChoice(fieldmap),
         )
         yield click.Option(
             ["--group"],
             help="Group results by given field.",
             multiple=True,
-            type=ClickSearchField(fieldmap),
+            type=FieldChoice(fieldmap),
         )
         yield click.Option(
             ["--desc"], is_flag=True, help="Sort results in descending order."
@@ -247,7 +230,7 @@ class ModelBase:
             ["--count"],
             help="Print a breakdown of all values for given field.",
             multiple=True,
-            type=ClickSearchField(fieldmap),
+            type=FieldChoice(fieldmap),
         )
 
     @classmethod
@@ -535,8 +518,8 @@ def fieldfilter(*param_decls, **opt_kwargs):
         def __init__(self, func: Callable):
             self.func = func
             self.opt_kwargs = {"param_decls": param_decls, **opt_kwargs}
-            if "help" not in self.opt_kwargs and func.__doc__:
-                self.opt_kwargs["help"] = func.__doc__
+            if "help" not in self.opt_kwargs:
+                self.opt_kwargs["help"] = inspect.cleandoc(func.__doc__)
 
         def __set_name__(self, owner: type[FieldBase], name: str):
             owner.register_filter(self.func, self.opt_kwargs)
@@ -580,13 +563,12 @@ class FieldBase(click.ParamType):
         self.key = key
         self.optname = optname
         self.helpname = helpname
+        self.typename = typename
         self.fmtname = fmtname
         self.verbosity = verbosity
         self.standalone = standalone
         self.fg = fg
         self.bold = bold
-        if typename:  # Otherwise fallback on class variable
-            self.name = typename
 
     def __set_name__(self, owner: type[ModelBase], name: str):
         """
@@ -726,6 +708,14 @@ class FieldBase(click.ParamType):
         except MissingField:
             pass
 
+    def get_metavar(self, *_):
+        return self.typename or self.name
+
+    def get_metavar_help(self):
+        if self.__doc__:
+            return inspect.cleandoc(self.__doc__)
+        return None
+
 
 class Number(FieldBase):
     """Class for defining a numeric field on a model."""
@@ -733,6 +723,7 @@ class Number(FieldBase):
     name = "NUMBER"
     operators = [
         ("==", operator.eq),
+        ("=", operator.eq),
         ("!=", operator.ne),
         ("!", operator.ne),
         ("<=", operator.le),
@@ -744,6 +735,13 @@ class Number(FieldBase):
     def __init__(self, *args, specials: list[str] | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         self.specials = specials
+
+    def get_metavar_help(self):
+        return (
+            "A number optionally prefixed by one of the supported comparison operators: "
+            f"{', '.join(op[0] for op in self.operators)}. With == being the default "
+            "if only a number is given."
+        )
 
     def convert(
         self, filterarg: Any, param: click.Parameter | None, ctx: click.Context | None
@@ -826,6 +824,12 @@ class String(FieldBase):
 
     name = "TEXT"
 
+    def get_metavar_help(self):
+        return (
+            "A text partially matching the field value. The --case, --regex and "
+            "--exact options can be applied. If prefixed with ! the match is negated."
+        )
+
     def preprocess_filterarg(
         self, filterarg: Any, opt: click.Parameter, options: dict
     ) -> Any | re.Pattern:
@@ -877,86 +881,6 @@ class String(FieldBase):
         return result ^ negate
 
 
-class Flag(FieldBase):
-    """Class for defining a boolean field on a model."""
-
-    name = "FLAG"
-
-    def validate(self, value: Any) -> Any:
-        """Converts `value` to `True` or `False` and return it."""
-        return value in (1, "1", True)
-
-    def sortkey(self, item: Mapping) -> Any:
-        """
-        Returns a comparable-type version of this field's value in `item`, used
-        for sorting. For `Flag` objects this is the inverse boolean of its
-        value so that truthy values are ordered first.
-        """
-        return not self.fetch(item)
-
-    @fieldfilter("--{optname}", is_flag=True, help="Filter on {helpname}.")
-    def filter_true(self, arg: Any, value: Any, options: dict) -> bool:
-        """Returns `value`. :)"""
-        return value
-
-    @fieldfilter("--non-{optname}", is_flag=True, help="Filter on non-{helpname}.")
-    def filter_false(self, arg: Any, value: Any, options: dict) -> bool:
-        """Returns the inversion of `value`."""
-        return not self.filter_true(arg, value, options)
-
-    def format_brief(self, value: Any) -> str:
-        """Returns a brief formatted version of `value` for this field."""
-        return str(self.fmtname) if value else f"Non-{self.fmtname}"
-
-    def format_long(self, value: Any) -> str:
-        """
-        Returns a long (single line) formatted version of `value` for this
-        field.
-        """
-        return f"{self.fmtname}: {'Yes' if value else 'No'}"
-
-
-class Choice(String, ClickSearchChoice):
-    """
-    Class for defining a text field on a model. The values of this field are
-    limited to a pre-defined set of values and option arguments against this
-    field are automatically completed to one of the choices.
-    """
-
-    name = "CHOICE"
-
-    def __init__(
-        self,
-        choices: dict[str, str] | Iterable[str],
-        **kwargs,
-    ):
-        String.__init__(self, **kwargs)
-        ClickSearchChoice.__init__(self, choices)
-
-    def preprocess_filterarg(
-        self, filterarg: Any, opt: click.Parameter, options: dict
-    ) -> Any:
-        """
-        Returns `filterarg` as-is since `Choice` field values are expected to
-        exactly match the defined set of `choices`.
-        """
-        return filterarg
-
-    def convert(
-        self, optarg: Any, param: click.Parameter | None, ctx: click.Context | None
-    ) -> Any:
-        """
-        Converts the option argument `optarg` using the
-        `ClickSearchChoice.convert` method.
-        """
-        return ClickSearchChoice.convert(self, optarg, param, ctx)
-
-    @fieldfilter("--{optname}", help="Filter on matching {helpname}.")
-    def filter_text(self, arg: Any, value: Any, options: dict) -> bool:
-        """Return `True` if `arg` equals `value`, otherwise `False`."""
-        return arg == value
-
-
 class SeparatedString(String):
     """
     Class for defining a multi-value text field on a model. The values of this
@@ -996,6 +920,138 @@ class SeparatedString(String):
             super(SeparatedString, self).filter_text(arg, part, options)
             for part in self.parts(value)
         )
+
+
+class Flag(FieldBase):
+    """Class for defining a boolean field on a model."""
+
+    name = "FLAG"
+
+    def validate(self, value: Any) -> Any:
+        """Converts `value` to `True` or `False` and return it."""
+        return value in (1, "1", True)
+
+    def sortkey(self, item: Mapping) -> Any:
+        """
+        Returns a comparable-type version of this field's value in `item`, used
+        for sorting. For `Flag` objects this is the inverse boolean of its
+        value so that truthy values are ordered first.
+        """
+        return not self.fetch(item)
+
+    @fieldfilter("--{optname}", is_flag=True, help="Filter on {helpname}.")
+    def filter_true(self, arg: Any, value: Any, options: dict) -> bool:
+        """Returns `value`. :)"""
+        return value
+
+    @fieldfilter("--non-{optname}", is_flag=True, help="Filter on non-{helpname}.")
+    def filter_false(self, arg: Any, value: Any, options: dict) -> bool:
+        """Returns the inversion of `value`."""
+        return not self.filter_true(arg, value, options)
+
+    def format_brief(self, value: Any) -> str:
+        """Returns a brief formatted version of `value` for this field."""
+        return str(self.fmtname) if value else f"Non-{self.fmtname}"
+
+    def format_long(self, value: Any) -> str:
+        """
+        Returns a long (single line) formatted version of `value` for this
+        field.
+        """
+        return f"{self.fmtname}: {'Yes' if value else 'No'}"
+
+
+class Choice(String):
+    """
+    Class for defining a text field on a model. The values of this field are
+    limited to a pre-defined set of values and option arguments against this
+    field are automatically completed to one of the choices.
+    """
+
+    name = "CHOICE"
+
+    def __init__(self, choices: dict[str, str] | Iterable[str], **kwargs):
+        if isinstance(choices, dict):
+            self.choices = {key.lower(): value or key for key, value in choices.items()}
+        else:
+            self.choices = {choice.lower(): choice for choice in choices}
+        super().__init__(**kwargs)
+
+    def __set_name__(self, owner: type[ModelBase], name: str):
+        """Also update the `name` property for `Choice` instances."""
+        super().__set_name__(owner, name)
+
+    def get_metavar(self, *_):
+        if self.typename:
+            return self.typename
+        if self.helpname:
+            return self.helpname.upper()
+        if self.optname:
+            return self.optname.upper()
+        return self.name
+
+    def get_metavar_help(self):
+        return f"One of: {', '.join(sorted(set(self.choices.values())))}."
+
+    def preprocess_filterarg(
+        self, filterarg: Any, opt: click.Parameter, options: dict
+    ) -> Any:
+        """
+        Returns `filterarg` as-is since `Choice` field values are expected to
+        exactly match the defined set of `choices`.
+        """
+        return filterarg
+
+    def convert(
+        self, optarg: Any, param: click.Parameter | None, ctx: click.Context | None
+    ) -> Any:
+        """
+        Converts the option argument `optarg` to the first matching choice in
+        `self.choices`. If no choice matches, then print an error message and
+        exit.
+        """
+        optarg = optarg.lower()
+        for lowerchoice, choice in self.choices.items():
+            if lowerchoice.startswith(optarg):
+                return choice
+        self.fail(
+            f"Valid choices are: {', '.join(sorted(set(self.choices.values())))}",
+            param=param,
+            ctx=ctx,
+        )
+
+    @fieldfilter("--{optname}", help="Filter on matching {helpname}.")
+    def filter_text(self, arg: Any, value: Any, options: dict) -> bool:
+        """Return `True` if `arg` equals `value`, otherwise `False`."""
+        return arg == value
+
+    @fieldfilter("--{optname}-isnt", help="Filter on non-matching {helpname}.")
+    def filter_text_isnt(self, arg: Any, value: Any, options: dict) -> bool:
+        """Return `False` if `arg` equals `value`, otherwise `True`."""
+        return arg != value
+
+
+class FieldChoice(Choice):
+    """
+    A `ParamType` class that completes the option argument to one of the
+    `FieldBase` instances defined on the command `model`.
+    """
+
+    name = "FIELD"
+
+    def __init__(self, fieldmap, *args, **kwargs):
+        self.fieldmap = fieldmap
+        super().__init__(fieldmap.keys(), *args, **kwargs)
+
+    def convert(
+        self, optarg: Any, param: click.Parameter | None, ctx: click.Context | None
+    ) -> Any:
+        """
+        Converts the `optarg` field name to the corresponding `FieldBase`
+        instance.
+        """
+        fieldname = super().convert(optarg, param, ctx)
+        return self.fieldmap[fieldname]
 
 
 class ChallengeIcons(Number):
@@ -1044,6 +1100,8 @@ class ChallengeIcons(Number):
 
 
 class Test(ModelBase):
+    """Test application."""
+
     __cmd_name__ = "Test"
     name = String(standalone=True, fg="cyan", bold=True)
     descriptor = String(verbosity=1, standalone=True, fg="yellow")
