@@ -98,8 +98,8 @@ class ClickSearchCommand(click.Command):
     """
 
     def __init__(self, *args, model: type[ModelBase], **kwargs):
-        if 'help' not in kwargs:
-            kwargs['help'] = model.__doc__
+        if "help" not in kwargs:
+            kwargs["help"] = model.__doc__
         super().__init__(*args, **kwargs)
         self.model = model
 
@@ -131,7 +131,9 @@ class ClickSearchCommand(click.Command):
         types = set(
             (param.type.get_metavar(), param.type.get_metavar_help())
             for param in self.get_params(ctx)
-            if param.type and hasattr(param.type, "get_metavar_help") and not param.is_flag
+            if param.type
+            and hasattr(param.type, "get_metavar_help")
+            and not param.is_flag
         )
         items = sorted((k, v) for k, v in types if k and v)
         if items:
@@ -209,7 +211,9 @@ class ModelBase:
             ["--regex"], is_flag=True, help="Use regular rexpressions when filtering."
         )
         yield click.Option(
-            ["--inclusive"], is_flag=True, help="Use regular rexpressions when filtering."
+            ["--inclusive"],
+            is_flag=True,
+            help="Use regular rexpressions when filtering.",
         )
         yield click.Option(
             ["--sort"],
@@ -375,7 +379,7 @@ class ModelBase:
                     tuple(
                         field.preprocess_filterarg(filterarg, opt, options)
                         for filterarg in filterargs
-                    )
+                    ),
                 )
 
     @classmethod
@@ -1060,7 +1064,9 @@ class ChallengeIcons(Number):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, skip_filters=[Number.filter_number], **kwargs)
 
-    def fetch(self, item: Mapping, default: Any | type = MissingField) -> tuple[int, int, int, int]:
+    def fetch(
+        self, item: Mapping, default: Any | type = MissingField
+    ) -> tuple[int, int, int, int]:
         """Returns all icon values in `item` as a tuple."""
         return tuple(self.validate(item.get(icon, 0)) for icon in self.icons)
 
@@ -1088,15 +1094,19 @@ class ChallengeIcons(Number):
         """Return a string representation of `value`."""
         terror, combat, arcane, investigation = value
         return (
-            click.style("T" * terror, fg="green") +
-            click.style("C" * combat, fg="red") +
-            click.style("A" * arcane, fg="magenta") +
-            click.style("I" * investigation, fg="yellow")
+            click.style("T" * terror, fg="green")
+            + click.style("C" * combat, fg="red")
+            + click.style("A" * arcane, fg="magenta")
+            + click.style("I" * investigation, fg="yellow")
         )
 
     def format_brief(self, value: Any) -> str:
         """Returns a brief formatted version of `value` for this field."""
-        return click.style("[", fg="blue") + self.format_value(value) + click.style("]", fg="blue")
+        return (
+            click.style("[", fg="blue")
+            + self.format_value(value)
+            + click.style("]", fg="blue")
+        )
 
 
 class Test(ModelBase):
