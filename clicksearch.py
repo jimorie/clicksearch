@@ -126,7 +126,7 @@ class ClickSearchCommand(click.Command):
             with formatter.section("Field filters"):
                 formatter.write_dl(fields)
 
-    def format_epilog(self, ctx: Context, formatter: HelpFormatter) -> None:
+    def format_epilog(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
         """Writes the field type help texts, and then the epilog."""
         types = set(
             (param.type.get_metavar(), param.type.get_metavar_help())
@@ -742,9 +742,9 @@ class Number(FieldBase):
 
     def get_metavar_help(self):
         return (
-            "A number optionally prefixed by one of the supported comparison operators: "
-            f"{', '.join(op[0] for op in self.operators)}. With == being the default "
-            "if only a number is given."
+            "A number optionally prefixed by one of the supported comparison "
+            f"operators: {', '.join(op[0] for op in self.operators)}. With "
+            "== being the default if only a number is given."
         )
 
     def convert(
@@ -1056,97 +1056,3 @@ class FieldChoice(Choice):
         """
         fieldname = super().convert(optarg, param, ctx)
         return self.fieldmap[fieldname]
-
-
-class ChallengeIcons(Number):
-    icons = ("terror", "combat", "arcane", "investigation")
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, skip_filters=[Number.filter_number], **kwargs)
-
-    def fetch(
-        self, item: Mapping, default: Any | type = MissingField
-    ) -> tuple[int, int, int, int]:
-        """Returns all icon values in `item` as a tuple."""
-        return tuple(self.validate(item.get(icon, 0)) for icon in self.icons)
-
-    @fieldfilter("--terror")
-    def filter_terror(self, arg: Callable, value: Any, options: dict) -> bool:
-        """Filter on number of terror icons."""
-        return self.filter_number(arg, value[0], options)
-
-    @fieldfilter("--combat")
-    def filter_combat(self, arg: Callable, value: Any, options: dict) -> bool:
-        """Filter on number of combat icons."""
-        return self.filter_number(arg, value[1], options)
-
-    @fieldfilter("--arcane")
-    def filter_arcane(self, arg: Callable, value: Any, options: dict) -> bool:
-        """Filter on number of arcance icons."""
-        return self.filter_number(arg, value[2], options)
-
-    @fieldfilter("--investigation")
-    def filter_investigation(self, arg: Callable, value: Any, options: dict) -> bool:
-        """Filter on number of investigation icons."""
-        return self.filter_number(arg, value[3], options)
-
-    def format_value(self, value: tuple[int, int, int, int]) -> str:
-        """Return a string representation of `value`."""
-        terror, combat, arcane, investigation = value
-        return (
-            click.style("T" * terror, fg="green")
-            + click.style("C" * combat, fg="red")
-            + click.style("A" * arcane, fg="magenta")
-            + click.style("I" * investigation, fg="yellow")
-        )
-
-    def format_brief(self, value: Any) -> str:
-        """Returns a brief formatted version of `value` for this field."""
-        return (
-            click.style("[", fg="blue")
-            + self.format_value(value)
-            + click.style("]", fg="blue")
-        )
-
-
-class Test(ModelBase):
-    """Test application."""
-
-    __cmd_name__ = "Test"
-    name = String(standalone=True, fg="cyan", bold=True)
-    descriptor = String(verbosity=1, standalone=True, fg="yellow")
-    subtypes = SeparatedString(
-        optname="subtype", separator=".", verbosity=1, standalone=True, fg="magenta"
-    )
-    unique = Flag(helpname="uniqueness")
-    faction = Choice(
-        choices={
-            "Agency": "The Agency",
-            "Cthulhu": None,
-            "Hastur": None,
-            "Miskatonic University": None,
-            "Neutral": None,
-            "Shub-Niggurath": None,
-            "Silver Twilight": None,
-            "Syndicate": None,
-            "The Agency": None,
-            "Yog-Sothoth": None,
-        },
-        inclusive=True,
-    )
-    cardtype = Choice(
-        choices=["Character", "Event", "Story", "Support"],
-        key="type",
-        optname="type",
-        realname="Card Type",
-        inclusive=True,
-    )
-    cost = Number(specials=["X"])
-    skill = Number(specials=["X"])
-    icons = ChallengeIcons()
-    restricted = Flag(verbosity=2)
-    banned = Flag(verbosity=2)
-
-
-if __name__ == "__main__":
-    Test.cli()
