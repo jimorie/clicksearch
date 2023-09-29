@@ -500,7 +500,7 @@ class ModelBase:
     def print_counts(cls, counts: dict[FieldBase, dict[str, int]], item_count: int):
         """Prints `counts` breakdowns."""
         for field, breakdown in counts.items():
-            click.secho(f"[ {field.fmtname} counts ]", fg="green", bold=True)
+            click.secho(f"[ {field.realname} counts ]", fg="green", bold=True)
             click.echo()
             for value, count in sorted(
                 breakdown.items(), key=operator.itemgetter(1), reverse=True
@@ -552,9 +552,9 @@ class FieldBase(click.ParamType):
         skip_filters: Iterable[Callable] | None = None,
         key: str | None = None,
         optname: str | None = None,
+        realname: str | None = None,
         helpname: str | None = None,
         typename: str | None = None,
-        fmtname: str | None = None,
         verbosity: int = 0,
         standalone: bool = False,
         fg: str | None = None,
@@ -566,9 +566,9 @@ class FieldBase(click.ParamType):
         self.skip_filters = skip_filters
         self.key = key
         self.optname = optname
-        self.helpname = helpname
-        self.typename = typename
-        self.fmtname = fmtname
+        self.realname = realname
+        self.helpname = helpname or realname and realname.lower()
+        self.typename = typename or realname and realname.upper()
         self.verbosity = verbosity
         self.standalone = standalone
         self.fg = fg
@@ -585,8 +585,8 @@ class FieldBase(click.ParamType):
             self.optname = name
         if self.helpname is None:
             self.helpname = name
-        if self.fmtname is None:
-            self.fmtname = name.title()
+        if self.realname is None:
+            self.realname = name.title()
         owner.register_field(self)
 
     @classmethod
@@ -697,7 +697,7 @@ class FieldBase(click.ParamType):
         value = self.format_value(value)
         if self.standalone:
             return value
-        return f"{self.fmtname}: {value}"
+        return f"{self.realname}: {value}"
 
     def style(self, value: Any) -> str:
         """Returns a styled `value` for this field."""
@@ -819,8 +819,8 @@ class Number(FieldBase):
     def format_brief(self, value: Any) -> str:
         """Returns a brief formatted version of `value` for this field."""
         if value is None:
-            return f"No {self.fmtname}"
-        return f"{value} {self.fmtname}"
+            return f"No {self.realname}"
+        return f"{value} {self.realname}"
 
 
 class String(FieldBase):
@@ -955,14 +955,14 @@ class Flag(FieldBase):
 
     def format_brief(self, value: Any) -> str:
         """Returns a brief formatted version of `value` for this field."""
-        return str(self.fmtname) if value else f"Non-{self.fmtname}"
+        return str(self.realname) if value else f"Non-{self.realname}"
 
     def format_long(self, value: Any) -> str:
         """
         Returns a long (single line) formatted version of `value` for this
         field.
         """
-        return f"{self.fmtname}: {'Yes' if value else 'No'}"
+        return f"{self.realname}: {'Yes' if value else 'No'}"
 
 
 class Choice(String):
@@ -1137,9 +1137,8 @@ class Test(ModelBase):
     cardtype = Choice(
         choices=["Character", "Event", "Story", "Support"],
         key="type",
-        helpname="card type",
-        typename="CARD TYPE",
         optname="type",
+        realname="Card Type",
         inclusive=True,
     )
     cost = Number(specials=["X"])
