@@ -28,6 +28,7 @@ format:
 lint:
 	ruff ${SRC}
 	black --check ${SRC}
+	mypy ${SRC}
 
 venv:
 	python3 -m venv ${VENV_DIR}

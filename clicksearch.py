@@ -131,8 +131,8 @@ class ClickSearchCommand(click.Command):
         types = set(
             (param.type.get_metavar(), param.type.get_metavar_help())
             for param in self.get_params(ctx)
-            if param.type
-            and hasattr(param.type, "get_metavar_help")
+            if isinstance(param, ClickSearchOption)
+            and isinstance(param.type, FieldBase)
             and not param.is_flag
         )
         items = sorted((k, v) for k, v in types if k and v)
@@ -522,7 +522,7 @@ def fieldfilter(*param_decls, **opt_kwargs):
         def __init__(self, func: Callable):
             self.func = func
             self.opt_kwargs = {"param_decls": param_decls, **opt_kwargs}
-            if "help" not in self.opt_kwargs:
+            if "help" not in self.opt_kwargs and func.__doc__:
                 self.opt_kwargs["help"] = inspect.cleandoc(func.__doc__)
 
         def __set_name__(self, owner: type[FieldBase], name: str):
