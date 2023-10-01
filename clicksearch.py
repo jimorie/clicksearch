@@ -12,7 +12,10 @@ import click
 
 
 if typing.TYPE_CHECKING:
-    from typing import Any, Callable, IO, Iterable, Mapping
+    from typing import Any, Callable, IO, Iterable, Iterator, Mapping
+
+
+Undefined = object()
 
 
 class ClickSearchException(click.ClickException):
@@ -30,28 +33,39 @@ class MissingField(ClickSearchException):
     pass
 
 
-class ReaderBase:
+class ReaderBase(collections.abc.Iterable):
     """Base class for reader objects."""
 
-    def read(self, options: dict) -> Iterable[Mapping]:
+    def __init__(self, options: dict):
+        pass
+
+    def __iter__(self) -> Iterator[Mapping]:
         raise NotImplementedError
+
+    @classmethod
+    def make_params(cls) -> Iterable[click.Parameter]:
+        """Yields all standard options required by the reader."""
+        return []
 
 
 class FileReader(ReaderBase):
     """Base class for reader objects operating on files."""
 
-    @staticmethod
-    def filenames(options: dict) -> Iterable[str]:
-        """Returns the filenames in `options`."""
-        return options.get("file", [])
+    def __init__(self, options: dict):
+        self.filenames = options["file"] or []
 
-    def files(self, options: dict) -> Iterable[IO]:
+    @classmethod
+    def make_params(cls) -> Iterable[click.Parameter]:
+        """Yields all standard options offered by the CLI."""
+        yield click.Argument(["file"], nargs=-1)
+
+    def files(self) -> Iterable[IO]:
         """
         Yields file handles for the file names in `self.filenames`. Raises
         variants of `OSError` if a file name cannot be opened for reading.
         """
         try:
-            for filename in self.filenames(options):
+            for filename in self.filenames:
                 with open(filename, "r") as fd:
                     yield fd
         except FileNotFoundError:
@@ -70,9 +84,9 @@ class JsonReader(FileReader):
     to be a list of objects.
     """
 
-    def read(self, options: dict) -> Iterable[Mapping]:
+    def __iter__(self) -> Iterator[Mapping]:
         """Yields items from files in `self.files`."""
-        for fd in self.files(options):
+        for fd in self.files():
             doc = json.load(fd)
             for item in doc:
                 yield item
@@ -84,11 +98,19 @@ class JsonLineReader(FileReader):
     object.
     """
 
-    def read(self, options: dict) -> Iterable[Mapping]:
+    def __iter__(self) -> Iterator[Mapping]:
         """Yields items from files in `self.files`."""
-        for fd in self.files(options):
+        for fd in self.files():
             for line in fd:
                 yield json.loads(line.rstrip())
+
+
+class ClickSearchContext(click.Context):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.filterdata: dict[
+            FieldBase, list[tuple[ClickSearchOption, Any]]
+        ] = collections.defaultdict(list)
 
 
 class ClickSearchCommand(click.Command):
@@ -97,11 +119,14 @@ class ClickSearchCommand(click.Command):
     class that defines the data items to operate on.
     """
 
-    def __init__(self, *args, model: type[ModelBase], **kwargs):
+    context_class = ClickSearchContext
+
+    def __init__(self, *args, model: type[ModelBase], reader: Callable, **kwargs):
         if "help" not in kwargs:
             kwargs["help"] = model.__doc__
         super().__init__(*args, **kwargs)
         self.model = model
+        self.reader = reader
 
     def format_options(self, ctx: click.Context, formatter: click.HelpFormatter):
         """
@@ -131,9 +156,9 @@ class ClickSearchCommand(click.Command):
         types = set(
             (param.type.get_metavar(), param.type.get_metavar_help())
             for param in self.get_params(ctx)
-            if isinstance(param, ClickSearchOption)
+            if param.type
             and isinstance(param.type, FieldBase)
-            and not param.is_flag
+            and not (isinstance(param, click.Option) and param.is_flag)
         )
         items = sorted((k, v) for k, v in types if k and v)
         if items:
@@ -166,36 +191,83 @@ class ClickSearchOption(click.Option):
 class ModelBase:
     """Base class for models used to define the data items to operate on."""
 
-    __cmd_name__: str
-
-    command_cls: type[ClickSearchCommand] = ClickSearchCommand
-    option_cls: type[ClickSearchOption] = ClickSearchOption
-    argument_cls: type[click.Argument] = click.Argument
-    reader_cls: type[ReaderBase] = JsonLineReader
-    fields: dict[FieldBase, list[ClickSearchOption]] = collections.defaultdict(list)
-    filterdata: dict[
-        FieldBase, list[tuple[ClickSearchOption, Any]]
-    ] = collections.defaultdict(list)
+    _standalone_mode = True
+    _command_name: str = "Base command"
+    _command_cls: type[ClickSearchCommand] = ClickSearchCommand
+    _option_cls: type[ClickSearchOption] = ClickSearchOption
+    _reader_cls: type[ReaderBase] = JsonLineReader
+    _fields: dict[type[ModelBase], dict[str, FieldBase]] = collections.defaultdict(dict)
 
     @classmethod
-    def make_command(cls) -> click.Command:
+    def register_field(cls, name: str, field: FieldBase):
+        cls._fields[cls][name] = field
+        if len(cls._fields[cls]) == 1:
+            cls.register_first_field(name, field)
+
+    @classmethod
+    def register_first_field(cls, name: str, field: FieldBase):
+        if field.styles is None:
+            field.styles = {}
+        field.styles.setdefault("fg", "cyan")
+        field.styles.setdefault("bold", True)
+        if field.standalone is Undefined:
+            field.standalone = True
+
+    @classmethod
+    def resolve_fields(cls) -> Iterable[FieldBase]:
+        """
+        Yields all fields registered on this model. Fields on parent models
+        are included but ordered after the child model, and any overloaded
+        field names are skipped.
+        """
+        seen = set()
+        for ancestor in cls.__mro__:
+            if not issubclass(ancestor, ModelBase):
+                break
+            for name, field in cls._fields[ancestor].items():
+                if name not in seen:
+                    yield field
+                    seen.add(name)
+
+    @classmethod
+    def resolve_filteroptions(cls) -> Iterable[ClickSearchOption]:
+        """
+        Yields tuples with all `ClickSearchOption` object registered for the
+        fields on this model. Searches parent classes but skips overloaded
+        field names.
+        """
+        for field in cls.resolve_fields():
+            yield from field.resolve_fieldfilteroptions()
+
+    @classmethod
+    def make_command(cls, reader: Callable) -> click.Command:
         """Returns the `click.Command` object used to run the CLI."""
-        cmdobj = cls.command_cls(cls.__cmd_name__, callback=cls.main, model=cls)
-        cmdobj.params.append(cls.make_argument())
-        cmdobj.params.extend(cls.make_options())
-        for field, options in cls.fields.items():
-            cmdobj.params.extend(options)
+        cmdobj = cls._command_cls(
+            cls._command_name,
+            callback=click.pass_context(cls.main),
+            model=cls,
+            reader=reader,
+        )
+        if hasattr(reader, "make_params"):
+            cmdobj.params.extend(reader.make_params())
+        cmdobj.params.extend(cls.make_params())
+        cmdobj.params.extend(cls.resolve_filteroptions())
         return cmdobj
 
     @classmethod
-    def make_options(cls) -> Iterable[click.Option]:
+    def make_params(cls) -> Iterable[click.Parameter]:
         """Yields all standard options offered by the CLI."""
-        fieldmap = {field.optname: field for field in cls.fields}
+        fieldmap = {field.optname: field for field in cls.resolve_fields()}
         yield click.Option(["--verbose", "-v"], count=True, help="Show more data.")
         yield click.Option(
             ["--brief"],
-            count=True,
+            is_flag=True,
             help="Show one line of data, regardless the level of verbose.",
+        )
+        yield click.Option(
+            ["--long"],
+            is_flag=True,
+            help="Show multiple lines of data, regardless the level of verbose.",
         )
         yield click.Option(
             ["--show"],
@@ -238,13 +310,8 @@ class ModelBase:
         )
 
     @classmethod
-    def make_argument(cls) -> click.Argument:
-        """Returns the `click.Argument` object used to handle non-option parameters."""
-        return cls.argument_cls(["file"], nargs=-1)
-
-    @classmethod
     def filter_callback(
-        cls, ctx: click.Context, opt: ClickSearchOption, filterarg: Any
+        cls, ctx: ClickSearchContext, opt: ClickSearchOption, filterarg: Any
     ) -> Any:
         """
         Registers the use of a filter option `opt` with `filterarg`. If any
@@ -253,61 +320,51 @@ class ModelBase:
         if len(filterarg):
             if opt.user_callback:
                 filterarg = opt.user_callback(ctx, opt, filterarg)
-            cls.filterdata[opt.field].append((opt, filterarg))
+            ctx.filterdata[opt.field].append((opt, filterarg))
         return filterarg
 
     @classmethod
-    def register_field(cls, field: FieldBase):
-        """
-        Registers a `field` assigned to this `cls` and all the options defined
-        for `field`.
-        """
-        fieldoptions = cls.fields[field]
-        for filter_func, opt_kwargs in field.resolve_fieldfilters():
-            new_kwargs = opt_kwargs.copy()
-            new_kwargs = field.format_opt_kwargs(new_kwargs)
-            callback = new_kwargs.pop("callback", None)
-            fieldoptions.append(
-                cls.option_cls(
-                    filter_func=filter_func,
-                    user_callback=callback,
-                    callback=cls.filter_callback,
-                    field=field,
-                    multiple=True,
-                    **new_kwargs,
-                )
-            )
-
-    @classmethod
-    def cli(cls):
+    def cli(
+        cls,
+        args: str | Iterable[str] | None = None,
+        reader: Callable | None = None,
+        **kwargs: Any,
+    ):
         """Run the CLI."""
-        cls.make_command()()
+        if isinstance(args, str):
+            import shlex
+
+            args = shlex.split(args)
+        kwargs.setdefault("standalone_mode", cls._standalone_mode)
+        cls.make_command(reader or cls._reader_cls)(args, **kwargs)
 
     @classmethod
-    def main(cls, **options: Any):
+    def main(cls, ctx: ClickSearchContext, **options: Any):
         """Main program flow used by the CLI."""
 
         # Pre-process all the options
-        cls.preprocess_filterdata(options)
+        cls.preprocess_filterdata(ctx.filterdata, options)
+
+        # Pre-process any implied filters
+        cls.preprocess_implied(options)
 
         # Set up an iterable over all the items
-        reader = cls.reader_cls()
-        items = reader.read(options)
+        if isinstance(ctx.command, ClickSearchCommand):
+            items = ctx.command.reader(options)
 
         # Filter the items
-        items = cls.filter_items(items, options)
+        items = cls.filter_items(ctx, items, options)
 
         # Sort the items
         items = cls.sort_items(items, options)
 
         # Adjust verbose based on numer of items found
         items = cls.adjust_verbose(items, options)
-        verbose = options["verbose"]
 
         # Set print_func based on verbosity
-        if verbose < 0:
+        if options["verbose"] < 0:
             print_func = None
-        elif verbose and not options["brief"]:
+        elif options["verbose"] and not options["brief"]:
             print_func = cls.print_long
         else:
             print_func = cls.print_brief
@@ -320,8 +377,8 @@ class ModelBase:
             current_group = []
 
         # Collect the fields we are interested in printing
-        if options["show"] and cls.fields:
-            title_field, *_ = cls.fields
+        if options["show"] and cls._fields[cls]:
+            title_field, *_ = cls._fields[cls]
             show_fields = [title_field, *options["show"]]
         else:
             show_fields = list(cls.collect_visible_fields(options))
@@ -347,7 +404,7 @@ class ModelBase:
             if group_fields:
                 next_group = [field.fetch(item, None) for field in group_fields]
                 if current_group != next_group:
-                    if current_group and not verbose:
+                    if current_group and not options["verbose"]:
                         click.echo()
                     header = " | ".join(
                         field.format_brief(value)
@@ -361,18 +418,17 @@ class ModelBase:
             print_func(show_fields, item, options)
 
         # Print breakdown counts
-        if verbose == 0:
+        if options["verbose"] == 0:
             click.echo()
         cls.print_counts(counts, item_count)
 
     @classmethod
-    def preprocess_filterdata(cls, options: dict):
+    def preprocess_filterdata(cls, filterdata: dict, options: dict):
         """
-        Pre-processes data in `cls.filterdata` after we have received all
-        options. Actual pre-processing is delegated to
-        `FieldBase.preprocess_filterarg`.
+        Pre-processes data in `filterdata` after we have received all options.
+        Actual pre-processing is delegated to `FieldBase.preprocess_filterarg`.
         """
-        for field, fieldfilters in cls.filterdata.items():
+        for field, fieldfilters in filterdata.items():
             for i, (opt, filterargs) in enumerate(fieldfilters):
                 fieldfilters[i] = (
                     opt,
@@ -383,19 +439,29 @@ class ModelBase:
                 )
 
     @classmethod
-    def filter_items(cls, items: Iterable[Mapping], options: dict) -> Iterable[Mapping]:
+    def preprocess_implied(cls, options: dict):
+        for field in cls.resolve_fields():
+            if field.implied:
+                field.preprocess_implied(options)
+
+    @classmethod
+    def filter_items(
+        cls, ctx: ClickSearchContext, items: Iterable[Mapping], options: dict
+    ) -> Iterable[Mapping]:
         """Yields the items that pass `cls.test_item`."""
         for item in items:
-            if cls.test_item(item, options):
+            if cls.test_item(ctx, item, options):
                 yield item
 
     @classmethod
-    def test_item(cls, item: Mapping, options: dict) -> bool:
+    def test_item(cls, ctx: ClickSearchContext, item: Mapping, options: dict) -> bool:
         """
         Returns `True` if `item` passes all filter options used, otherwise
         `False`.
         """
-        for field, fieldfilters in cls.filterdata.items():
+        for field, fieldfilters in ctx.filterdata.items():
+            if not field.test_implied(item):
+                return False
             try:
                 value = field.fetch(item)
             except MissingField:
@@ -432,22 +498,23 @@ class ModelBase:
         """
         if options["brief"]:
             options["verbose"] = 0
-        elif isinstance(items, list):
-            if len(items) == 1:
-                options["verbose"] += 1
-        elif not options["count"]:
-            item_1 = item_2 = None
-            try:
-                item_1 = next(items)
-                item_2 = next(items)
-            except StopIteration:
-                if item_1 is None:
-                    items = []
-                elif item_2 is None:
-                    items = [item_1]
+        elif not options["long"]:
+            if isinstance(items, list):
+                if len(items) == 1:
                     options["verbose"] += 1
             else:
-                items = itertools.chain([item_1, item_2], items)
+                item_1 = item_2 = None
+                try:
+                    item_1 = next(items)
+                    item_2 = next(items)
+                except StopIteration:
+                    if item_1 is None:
+                        items = []
+                    elif item_2 is None:
+                        items = [item_1]
+                        options["verbose"] += 1
+                else:
+                    items = itertools.chain([item_1, item_2], items)
         if options["count"]:
             options["verbose"] -= 1
         return items
@@ -455,13 +522,13 @@ class ModelBase:
     @classmethod
     def collect_visible_fields(cls, options):
         """Yields all fields that should be considered for printing."""
-        for field in cls.fields:
+        for field in cls.resolve_fields():
             if options["verbose"] < field.verbosity:
                 continue
             yield field
 
     @classmethod
-    def print_brief(cls, fields: Iterable[FieldBase], item: Mapping, options: dict):
+    def print_brief(cls, fields: list[FieldBase], item: Mapping, options: dict):
         """Prints a one-line representation of `item`."""
         first = True
         for field in fields:
@@ -470,28 +537,28 @@ class ModelBase:
             except MissingField:
                 continue
             value = field.format_brief(value)
-            if first:
-                value += click.style(": ", fg=field.fg, bold=field.bold)
-                first = False
-            else:
-                value += ". "
-            click.echo(value, nl=False)
+            if value:
+                if first:
+                    if len(fields) > 1:
+                        if field.styles:
+                            value += click.style(": ", **field.styles)
+                        else:
+                            value += ": "
+                    first = False
+                else:
+                    value += ". "
+                click.echo(value, nl=False)
         click.echo()
 
     @classmethod
     def print_long(cls, fields: list[FieldBase], item: Mapping, options: dict):
         """Prints a multi-line representation of `item`."""
-        first = True
         for field in fields:
             try:
                 value = field.fetch(item)
             except MissingField:
                 continue
-            if first:
-                value = value and click.style(value, fg="cyan", bold=True)
-                first = False
-            else:
-                value = field.format_long(value)
+            value = field.format_long(value)
             if value:
                 click.echo(value)
         click.echo()
@@ -540,54 +607,56 @@ class FieldBase(click.ParamType):
 
     name: str
 
-    fieldfilters: dict[type, list[tuple[Callable, dict]]] = collections.defaultdict(
-        list
-    )
+    fieldfilters: dict[
+        type[FieldBase], list[tuple[Callable, dict]]
+    ] = collections.defaultdict(list)
 
     def __init__(
         self,
-        default: Any = None,
-        nullable: bool = False,
+        default: Any | type = MissingField,
         inclusive: bool = False,
         skip_filters: Iterable[Callable] | None = None,
-        key: str | None = None,
+        keyname: str | None = None,
         optname: str | None = None,
         realname: str | None = None,
         helpname: str | None = None,
         typename: str | None = None,
         verbosity: int = 0,
-        standalone: bool = False,
-        fg: str | None = None,
-        bold: bool = False,
+        standalone: bool | object = Undefined,
+        implied: dict | None = None,
+        styles: dict | None = None,
     ):
         self.default = default
-        self.nullable = nullable
         self.inclusive = inclusive
         self.skip_filters = skip_filters
-        self.key = key
+        self.keyname = keyname
         self.optname = optname
         self.realname = realname
         self.helpname = helpname or realname and realname.lower()
         self.typename = typename or realname and realname.upper()
         self.verbosity = verbosity
         self.standalone = standalone
-        self.fg = fg
-        self.bold = bold
+        self.implied = implied
+        self.styles = styles
+
+        # Set when assigned to a model
+        self.owner: type[ModelBase] = None  # type: ignore
 
     def __set_name__(self, owner: type[ModelBase], name: str):
         """
         Registers this `FieldBase` instance on a `ModelBase` class under the
         given `name`.
         """
-        if self.key is None:
-            self.key = name
+        self.owner = owner
+        if self.keyname is None:
+            self.keyname = name
         if self.optname is None:
-            self.optname = name
+            self.optname = name.replace("_", "-")
         if self.helpname is None:
-            self.helpname = name
+            self.helpname = name.replace("_", " ")
         if self.realname is None:
-            self.realname = name.title()
-        owner.register_field(self)
+            self.realname = name.replace("_", " ").title()
+        owner.register_field(name, self)
 
     @classmethod
     def register_filter(cls, filter_func: Callable, opt_kwargs: dict):
@@ -614,18 +683,26 @@ class FieldBase(click.ParamType):
                 yield filter_func, opt_kwargs
                 seen.add(filter_func.__name__)
 
-    def convert(
-        self, filterarg: Any, param: click.Parameter | None, ctx: click.Context | None
-    ) -> Any:
+    def resolve_fieldfilteroptions(self) -> Iterable[ClickSearchOption]:
         """
-        Converts an option argument `optarg` for this field and return the new
-        value. This calls `validate` and handles any `TypeError` or
-        `ValueError` raised by re-raising a `click.BadParameter` exception.
+        Yields `ClickSearchOption` objects for all filters defined with the
+        `fieldfilter` decorator on this field and its ancestors. Overloaded
+        filters are only yielded once.
         """
-        try:
-            return self.validate(filterarg)
-        except (ValueError, TypeError):
-            raise click.BadParameter(str(filterarg), ctx=ctx, param=param)
+        if not self.owner:
+            raise RuntimeError("cannot resolve filter options without owner set")
+        for filter_func, opt_kwargs in self.resolve_fieldfilters():
+            new_kwargs = opt_kwargs.copy()
+            new_kwargs = self.format_opt_kwargs(new_kwargs)
+            callback = new_kwargs.pop("callback", None)
+            yield self.owner._option_cls(
+                filter_func=filter_func,
+                user_callback=callback,
+                callback=self.owner.filter_callback,
+                field=self,
+                multiple=True,
+                **new_kwargs,
+            )
 
     def format_opt_kwargs(self, opt_kwargs: dict) -> dict:
         """Resolves format placeholders in all `opt_kwargs`."""
@@ -641,11 +718,44 @@ class FieldBase(click.ParamType):
         """Resolves format placeholders in the single `arg`."""
         return arg.format(optname=self.optname, helpname=self.helpname)
 
+    def convert(
+        self,
+        filterarg: Any,
+        param: click.Parameter | None,
+        ctx: click.Context | None,
+    ) -> Any:
+        """
+        Converts an option argument `optarg` for this field and return the new
+        value. This calls `validate` and handles any `TypeError` or
+        `ValueError` raised by re-raising a `click.BadParameter` exception.
+        """
+        try:
+            return self.validate(filterarg)
+        except (ValueError, TypeError):
+            raise click.BadParameter(str(filterarg), ctx=ctx, param=param)
+
     def preprocess_filterarg(
         self, filterarg: Any, opt: click.Parameter, options: dict
     ) -> Any:
         """Pre-processes a `filterarg` for an `opt` used as a filter for this field."""
         return filterarg
+
+    def preprocess_implied(self, options: dict):
+        if self.implied:
+            self.implied = {
+                getattr(self.owner, fieldname): filterarg
+                for fieldname, filterarg in self.implied.items()
+            }
+
+    def test_implied(self, item: Mapping) -> bool:
+        if self.implied:
+            for field, filterarg in self.implied.items():
+                try:
+                    if field.fetch(item) != filterarg:
+                        return False
+                except MissingField:
+                    return False
+        return True
 
     def validate(self, value: Any) -> Any:
         """Validates `value` and return a possibly converted value."""
@@ -661,15 +771,15 @@ class FieldBase(click.ParamType):
           exception if the value cannot be converted by that method.
         """
         try:
-            value = item[self.key]
+            value = item[self.keyname]
         except KeyError:
             if default is MissingField:
-                raise MissingField(f"Value missing: {self.key}")
-            value = default
-        if value is None and self.nullable is False:
-            if default is MissingField:
-                raise MissingField(f"Value required: {self.key}")
-            value = default
+                if self.default is MissingField:
+                    raise MissingField(f"Value missing: {self.keyname}")
+                else:
+                    value = self.default
+            else:
+                value = default
         return self.validate(value)
 
     def sortkey(self, item: Mapping) -> Any:
@@ -695,14 +805,14 @@ class FieldBase(click.ParamType):
         field.
         """
         value = self.format_value(value)
-        if self.standalone:
+        if self.standalone is True:
             return value
         return f"{self.realname}: {value}"
 
     def style(self, value: Any) -> str:
         """Returns a styled `value` for this field."""
-        if self.fg:
-            return click.style(value, fg=self.fg, bold=self.bold)
+        if self.styles:
+            return click.style(value, **self.styles)
         return value
 
     def count(self, item: Mapping, counts: collections.Counter):
@@ -713,9 +823,14 @@ class FieldBase(click.ParamType):
             pass
 
     def get_metavar(self, *_):
+        """Return the name of the option argument for this field used in `--help`."""
         return self.typename or self.name
 
     def get_metavar_help(self):
+        """
+        Return a longer description of the option argument for this field used
+        in `--help`.
+        """
         if self.__doc__:
             return inspect.cleandoc(self.__doc__)
         return None
@@ -748,7 +863,10 @@ class Number(FieldBase):
         )
 
     def convert(
-        self, filterarg: Any, param: click.Parameter | None, ctx: click.Context | None
+        self,
+        filterarg: Any,
+        param: click.Parameter | None,
+        ctx: click.Context | None,
     ) -> Any:
         """
         Converts `filterarg` to a function that implements the comparison. If
