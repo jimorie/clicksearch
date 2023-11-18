@@ -271,7 +271,10 @@ class ModelBase:
         )
         yield click.Option(
             ["--show"],
-            help="Show given field only.",
+            help=(
+                "Show given field only. Can be repeated to show multiple fields "
+                "in given order."
+            ),
             multiple=True,
             type=FieldChoice(fieldmap),
         )
@@ -285,7 +288,10 @@ class ModelBase:
         yield click.Option(
             ["--inclusive"],
             is_flag=True,
-            help="Use regular rexpressions when filtering.",
+            help=(
+                "Use inclusive filtering that expand the result rather than "
+                "shrinking it."
+            ),
         )
         yield click.Option(
             ["--sort"],
@@ -378,8 +384,11 @@ class ModelBase:
 
         # Collect the fields we are interested in printing
         if options["show"] and cls._fields[cls]:
-            title_field, *_ = cls._fields[cls]
-            show_fields = [title_field, *options["show"]]
+            title_field, *_ = cls._fields[cls].values()
+            if title_field in options["show"]:
+                show_fields = options["show"]
+            else:
+                show_fields = [title_field, *options["show"]]
         else:
             show_fields = list(cls.collect_visible_fields(options))
 

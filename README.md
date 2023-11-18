@@ -28,11 +28,13 @@ Options:
   -v, --verbose  Show more data.
   --brief        Show one line of data, regardless the level of verbose.
   --long         Show multiple lines of data, regardless the level of verbose.
-  --show FIELD   Show given field only.
+  --show FIELD   Show given field only. Can be repeated to show multiple
+                 fields in given order.
   --case         Use case sensitive filtering.
   --exact        Use exact match filtering.
   --regex        Use regular rexpressions when filtering.
-  --inclusive    Use regular rexpressions when filtering.
+  --inclusive    Use inclusive filtering that expand the result rather than
+                 shrinking it.
   --sort FIELD   Sort results by given field.
   --group FIELD  Group results by given field.
   --desc         Sort results in descending order.
@@ -501,11 +503,13 @@ Options:
   -v, --verbose  Show more data.
   --brief        Show one line of data, regardless the level of verbose.
   --long         Show multiple lines of data, regardless the level of verbose.
-  --show FIELD   Show given field only.
+  --show FIELD   Show given field only. Can be repeated to show multiple
+                 fields in given order.
   --case         Use case sensitive filtering.
   --exact        Use exact match filtering.
   --regex        Use regular rexpressions when filtering.
-  --inclusive    Use regular rexpressions when filtering.
+  --inclusive    Use inclusive filtering that expand the result rather than
+                 shrinking it.
   --sort FIELD   Sort results by given field.
   --group FIELD  Group results by given field.
   --desc         Sort results in descending order.
@@ -592,11 +596,13 @@ Options:
   -v, --verbose  Show more data.
   --brief        Show one line of data, regardless the level of verbose.
   --long         Show multiple lines of data, regardless the level of verbose.
-  --show FIELD   Show given field only.
+  --show FIELD   Show given field only. Can be repeated to show multiple
+                 fields in given order.
   --case         Use case sensitive filtering.
   --exact        Use exact match filtering.
   --regex        Use regular rexpressions when filtering.
-  --inclusive    Use regular rexpressions when filtering.
+  --inclusive    Use inclusive filtering that expand the result rather than
+                 shrinking it.
   --sort FIELD   Sort results by given field.
   --group FIELD  Group results by given field.
   --desc         Sort results in descending order.
@@ -630,11 +636,13 @@ Options:
   -v, --verbose  Show more data.
   --brief        Show one line of data, regardless the level of verbose.
   --long         Show multiple lines of data, regardless the level of verbose.
-  --show FIELD   Show given field only.
+  --show FIELD   Show given field only. Can be repeated to show multiple
+                 fields in given order.
   --case         Use case sensitive filtering.
   --exact        Use exact match filtering.
   --regex        Use regular rexpressions when filtering.
-  --inclusive    Use regular rexpressions when filtering.
+  --inclusive    Use inclusive filtering that expand the result rather than
+                 shrinking it.
   --sort FIELD   Sort results by given field.
   --group FIELD  Group results by given field.
   --desc         Sort results in descending order.
@@ -668,11 +676,13 @@ Options:
   -v, --verbose  Show more data.
   --brief        Show one line of data, regardless the level of verbose.
   --long         Show multiple lines of data, regardless the level of verbose.
-  --show FIELD   Show given field only.
+  --show FIELD   Show given field only. Can be repeated to show multiple
+                 fields in given order.
   --case         Use case sensitive filtering.
   --exact        Use exact match filtering.
   --regex        Use regular rexpressions when filtering.
-  --inclusive    Use regular rexpressions when filtering.
+  --inclusive    Use inclusive filtering that expand the result rather than
+                 shrinking it.
   --sort FIELD   Sort results by given field.
   --group FIELD  Group results by given field.
   --desc         Sort results in descending order.
