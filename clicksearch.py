@@ -49,15 +49,17 @@ class ReaderBase(collections.abc.Iterable):
 
 
 class FileReader(ReaderBase):
-    """Base class for reader objects operating on files."""
+    """Reader that reads from files specified as CLI parameters."""
+
+    file_parameter = "file"
 
     def __init__(self, options: dict):
-        self.filenames = options["file"] or []
+        self.filenames = options[self.file_parameter] or []
 
     @classmethod
     def make_params(cls) -> Iterable[click.Parameter]:
         """Yields all standard options offered by the CLI."""
-        yield click.Argument(["file"], nargs=-1)
+        yield click.Argument([cls.file_parameter], nargs=-1)
 
     def files(self) -> Iterable[IO]:
         """
@@ -106,6 +108,12 @@ class JsonLineReader(FileReader):
 
 
 class ClickSearchContext(click.Context):
+    """
+    Default clicksearch `Context` class. In addition to the base
+    `click.Context` class, this adds a datastructure used to collect all field
+    filter arguments specified during an execution.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.filterdata: dict[
@@ -200,12 +208,14 @@ class ModelBase:
 
     @classmethod
     def register_field(cls, name: str, field: FieldBase):
+        """Register a `field` by `name` on this model."""
         cls._fields[cls][name] = field
         if len(cls._fields[cls]) == 1:
             cls.register_first_field(name, field)
 
     @classmethod
     def register_first_field(cls, name: str, field: FieldBase):
+        """Set up specific setting for the first `field`registered on this model."""
         if field.styles is None:
             field.styles = {}
         field.styles.setdefault("fg", "cyan")
@@ -449,6 +459,7 @@ class ModelBase:
 
     @classmethod
     def preprocess_implied(cls, options: dict):
+        """Call `FieldBase.preprocess_implied` on all fields."""
         for field in cls.resolve_fields():
             if field.implied:
                 field.preprocess_implied(options)
@@ -750,6 +761,7 @@ class FieldBase(click.ParamType):
         return filterarg
 
     def preprocess_implied(self, options: dict):
+        """Resolve any string references to fields by name in `implied` data."""
         if self.implied:
             self.implied = {
                 getattr(self.owner, fieldname): filterarg
@@ -757,6 +769,7 @@ class FieldBase(click.ParamType):
             }
 
     def test_implied(self, item: Mapping) -> bool:
+        """Return `True` if `item` meets all `implied` criteria, otherwise `False`."""
         if self.implied:
             for field, filterarg in self.implied.items():
                 try:
