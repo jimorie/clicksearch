@@ -254,7 +254,7 @@ class ModelBase:
         """Returns the `click.Command` object used to run the CLI."""
         cmdobj = cls._command_cls(
             cls._command_name,
-            callback=click.pass_context(cls.main),
+            callback=click.pass_context(cls.main),  # type: ignore
             model=cls,
             reader=reader,
         )
@@ -963,7 +963,7 @@ class Number(FieldBase):
         return f"{value} {self.realname}"
 
 
-class String(FieldBase):
+class Text(FieldBase):
     """Class for defining a text field on a model."""
 
     name = "TEXT"
@@ -978,7 +978,7 @@ class String(FieldBase):
         self, filterarg: Any, opt: click.Parameter, options: dict
     ) -> Any | re.Pattern:
         """
-        Pre-processes `filterarg` for comparison against `String` field
+        Pre-processes `filterarg` for comparison against `Text` field
         values, depending on the `options` used.
         """
         if not options["case"]:
@@ -995,7 +995,7 @@ class String(FieldBase):
     def sortkey(self, item: Mapping) -> Any:
         """
         Returns a comparable-type version of this field's value in `item`, used
-        for sorting. For `String` objects this is guaranteed to be of type
+        for sorting. For `Text` objects this is guaranteed to be of type
         `str`.
         """
         try:
@@ -1025,27 +1025,27 @@ class String(FieldBase):
         return result ^ negate
 
 
-class SeparatedString(String):
+class DelimitedText(Text):
     """
     Class for defining a multi-value text field on a model. The values of this
-    field can include a given string separator, so that when split by this
-    separator each split part is treated individually.
+    field can include a given string delimiter, so that when split by this
+    delimiter, each split part is treated individually.
     """
 
-    def __init__(self, separator: str = ",", **kwargs):
+    def __init__(self, delimiter: str = ",", **kwargs):
         super().__init__(**kwargs)
-        self.separator = separator
+        self.delimiter = delimiter
 
     def parts(self, value: str) -> Iterable[str]:
-        """Yields each individual part of the `SeparatedString`."""
-        for part in value.split(self.separator):
+        """Yields each individual part of the `DelimitedText`."""
+        for part in value.split(self.delimiter):
             part = part.strip()
             if part:
                 yield part
 
     def count(self, item: Mapping, counts: collections.Counter):
         """
-        Increments the count of each part in the `SeparatedString`
+        Increments the count of each part in the `DelimitedText`
         individually.
         """
         try:
@@ -1061,7 +1061,7 @@ class SeparatedString(String):
         depending on `options`, otherwise `False`.
         """
         return any(
-            super(SeparatedString, self).filter_text(arg, part, options)
+            super(DelimitedText, self).filter_text(arg, part, options)
             for part in self.parts(value)
         )
 
@@ -1105,7 +1105,7 @@ class Flag(FieldBase):
         return f"{self.realname}: {'Yes' if value else 'No'}"
 
 
-class Choice(String):
+class Choice(Text):
     """
     Class for defining a text field on a model. The values of this field are
     limited to a pre-defined set of values and option arguments against this

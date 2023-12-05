@@ -14,7 +14,7 @@ At the heart of Clicksearch is the model. Every Clicksearch program needs to def
 
 ```python
 class MyModel(ModelBase):
-    name = String()
+    name = Text()
     value = Number()
 ```
 
@@ -119,10 +119,10 @@ Your complete CLI program would then look something like this:
 ```python
 #!/usr/bin/env python3
 
-from clicksearch import ModelBase, String, Number
+from clicksearch import ModelBase, Text, Number
 
 class MyModel(ModelBase):
-    name = String()
+    name = Text()
     value = Number()
 
 def reader(options: dict):
@@ -139,17 +139,17 @@ if __name__ == '__main__':
 
 Fields are the objects used to compose your model. Clicksearch comes with number of basic field types built-in, but you can of course also define your own field type by subclassing from the `FieldBase` class (or from any other built-in field type).
 
-### String
+### Text
 
-`String` fields support `str` values and implement a single filter option that matches any part of the field value. In the example below the option will be given the default name `--name`. The behavior of the `String` field filter can then be further controlled with the `--case`, `--exact` and `--regex` options.
+`Text` fields support `str` values and implement a single filter option that matches any part of the field value. In the example below the option will be given the default name `--name`. The behavior of the `Text` field filter can then be further controlled with the `--case`, `--exact` and `--regex` options.
 
 ```python
-class MyStringModel(ModelBase):
-    name = String()
+class MyTextModel(ModelBase):
+    name = Text()
 ```
 
 ```pycon
->>> MyStringModel.cli('', reader=reader)
+>>> MyTextModel.cli('', reader=reader)
 Lorem Ipsum
 Dolor Sit Amet
 
@@ -157,37 +157,37 @@ Total count: 2
 ```
 
 ```pycon
->>> MyStringModel.cli('--name "lorem"', reader=reader)
+>>> MyTextModel.cli('--name "lorem"', reader=reader)
 Lorem Ipsum
 
 Total count: 1
 ```
 
 ```pycon
->>> MyStringModel.cli('--name "amet"', reader=reader)
+>>> MyTextModel.cli('--name "amet"', reader=reader)
 Dolor Sit Amet
 
 Total count: 1
 ```
 
 ```pycon
->>> MyStringModel.cli('--name "foo"', reader=reader)
+>>> MyTextModel.cli('--name "foo"', reader=reader)
 
 Total count: 0
 ```
 
 #### `--case`
 
-The `--case` option makes the `String` field filter case sensitive.
+The `--case` option makes the `Text` field filter case sensitive.
 
 ```pycon
->>> MyStringModel.cli('--name "lorem" --case', reader=reader)
+>>> MyTextModel.cli('--name "lorem" --case', reader=reader)
 
 Total count: 0
 ```
 
 ```pycon
->>> MyStringModel.cli('--name "Lorem" --case', reader=reader)
+>>> MyTextModel.cli('--name "Lorem" --case', reader=reader)
 Lorem Ipsum
 
 Total count: 1
@@ -195,16 +195,16 @@ Total count: 1
 
 #### `--exact`
 
-The `--exact` option makes the `String` field filter require a full match.
+The `--exact` option makes the `Text` field filter require a full match.
 
 ```pycon
->>> MyStringModel.cli('--name "Lorem" --exact', reader=reader)
+>>> MyTextModel.cli('--name "Lorem" --exact', reader=reader)
 
 Total count: 0
 ```
 
 ```pycon
->>> MyStringModel.cli('--name "Lorem Ipsum" --exact', reader=reader)
+>>> MyTextModel.cli('--name "Lorem Ipsum" --exact', reader=reader)
 Lorem Ipsum
 
 Total count: 1
@@ -212,17 +212,17 @@ Total count: 1
 
 #### `--regex`
 
-The `--regex` option makes the `String` field filter operate as a [regular expression](https://docs.python.org/3/library/re.html).
+The `--regex` option makes the `Text` field filter operate as a [regular expression](https://docs.python.org/3/library/re.html).
 
 ```pycon
->>> MyStringModel.cli('--name "\\b[lorem]+\\b" --regex', reader=reader)
+>>> MyTextModel.cli('--name "\\b[lorem]+\\b" --regex', reader=reader)
 Lorem Ipsum
 
 Total count: 1
 ```
 
 ```pycon
->>> MyStringModel.cli('--name "\\b[loremd]+\\b" --regex', reader=reader)
+>>> MyTextModel.cli('--name "\\b[loremd]+\\b" --regex', reader=reader)
 Lorem Ipsum
 Dolor Sit Amet
 
@@ -235,7 +235,7 @@ Total count: 2
 
 ```python
 class MyNumberModel(ModelBase):
-    name = String()
+    name = Text()
     value = Number()
 ```
 
@@ -277,7 +277,7 @@ Total count: 1
 
 ```python
 class MyNumberModel(ModelBase):
-    name = String()
+    name = Text()
     value = Number(specials=['X'])
 
 def specials(options: dict):
@@ -309,14 +309,14 @@ Value: 1
 Total count: 1
 ```
 
-### SeparatedString
+### DelimitedText
 
-`SeparatedString` fields behave like a list of `String` fields, where each part is separated by a given `str` delimiter. Each part is then matched individually.
+`DelimitedText` fields behave like a list of `Text` fields, where each part is separated by a given `str` delimiter. Each part is then matched individually.
 
 ```python
 class Recipe(ModelBase):
-    name = String()
-    ingredients = SeparatedString(separator=",")
+    name = Text()
+    ingredients = DelimitedText(delimiter=",")
 
 def recipes(options: dict):
     yield {"name": "Sandwich", "ingredients": "bread,cheese"}
@@ -345,7 +345,7 @@ Total count: 1
 
 ```python
 class Person(ModelBase):
-    name = String()
+    name = Text()
     alive = Flag()
 
 def people(options: dict):
@@ -379,11 +379,11 @@ Total count: 1
 
 ### Choice
 
-`Choice` fields behave as `String` fields but have a defined set of valid values. Prefix arguments are automatically completed to the valid choice.
+`Choice` fields behave as `Text` fields but have a defined set of valid values. Prefix arguments are automatically completed to the valid choice.
 
 ```python
 class Person(ModelBase):
-    name = String()
+    name = Text()
     gender = Choice(["Female", "Male", "Other"])
 
 def people(options: dict):
@@ -425,7 +425,7 @@ Define a default value used for fields where the value is missing.
 
 ```python
 class Person(ModelBase):
-    name = String()
+    name = Text()
     gender = Choice(["Female", "Male", "Other"], default="Other")
 
 def people(options: dict):
@@ -446,7 +446,7 @@ Treat multiple uses of this field's filters as a [logical disjunction](https://e
 
 ```python
 class Person(ModelBase):
-    name = String()
+    name = Text()
     gender = Choice(["Female", "Male", "Other"], inclusive=True)
 
 def people(options: dict):
@@ -490,7 +490,7 @@ Don't add the given filter option for this field.
 
 ```python
 class Person(ModelBase):
-    name = String()
+    name = Text()
     age = Number()
     height = Number(skip_filters=[Number.filter_number])
 ```
@@ -528,7 +528,7 @@ The item key for getting this field's value. Defaults to the same as the field p
 
 ```python
 class MyModel(ModelBase):
-    name = String(keyname="foo")
+    name = Text(keyname="foo")
 
 def reader(options: dict):
     yield {'foo': 'Lorem Ipsum'}
@@ -550,7 +550,7 @@ title-case version of the field property name.
 
 ```python
 class MyModel(ModelBase):
-    name = String()
+    name = Text()
     value = Number(realname="Foo")
 
 def reader(options: dict):
@@ -581,7 +581,7 @@ Defaults to field property name, but with `_` replaced with `-`.
 
 ```python
 class MyModel(ModelBase):
-    name = String(optname="foo")
+    name = Text(optname="foo")
 
 def reader(options: dict):
     yield {'foo': 'Lorem Ipsum'}
@@ -621,7 +621,7 @@ texts. Defaults to a lowercase version of `realname`.
 
 ```python
 class MyModel(ModelBase):
-    name = String(helpname="foo")
+    name = Text(helpname="foo")
 
 def reader(options: dict):
     yield {'name': 'Lorem Ipsum'}
@@ -661,7 +661,7 @@ the `name` property of the field class.
 
 ```python
 class MyModel(ModelBase):
-    name = String(typename="FOO")
+    name = Text(typename="FOO")
 
 def reader(options: dict):
     yield {'name': 'Lorem Ipsum'}
@@ -700,7 +700,7 @@ The level of `verbose` required for this field to be included in the output.
 
 ```python
 class MyModel(ModelBase):
-    name = String()
+    name = Text()
     foo = Number(verbosity=1)
     bar = Number()
     baz = Number(verbosity=2)
@@ -784,8 +784,8 @@ otherwise `False`.
 
 ```python
 class Philosopher(ModelBase):
-    name = String(standalone=False)
-    quote = String(standalone=True)
+    name = Text(standalone=False)
+    quote = Text(standalone=True)
 
 def reader(options: dict):
     yield {'name': 'Aristotle', 'quote': '"Quality is not an act, it is a habit."'}
@@ -809,7 +809,7 @@ A dict of related field filters that are implied by filtering on this field.
 
 ```python
 class Species(ModelBase):
-    name = String()
+    name = Text()
     type = Choice(['Mammal', 'Fish', 'Bird', 'Reptile', 'Amphibian'])
     gestation_period = Number(implied={'type': 'Mammal'})
 
