@@ -352,7 +352,14 @@ class ModelBase:
 
             args = shlex.split(args)
         kwargs.setdefault("standalone_mode", cls._standalone_mode)
-        cls.make_command(reader or cls._reader_cls)(args, **kwargs)
+        try:
+            cls.make_command(reader or cls._reader_cls)(args, **kwargs)
+        except click.ClickException as e:
+            if kwargs["standalone_mode"]:
+                raise
+            # We are in test mode and want to show the error without exiting
+            # the REPL
+            e.show()
 
     @classmethod
     def main(cls, ctx: ClickSearchContext, **options: Any):

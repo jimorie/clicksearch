@@ -32,8 +32,10 @@ lint:
 	mypy --check-untyped-defs ${SRC}
 
 test:
+	@# Redirect stderr to stdout
+	@echo '>>> import sys; sys.stderr = sys.stdout' > README.md.test
 	@# Automagically import everything
-	@echo '>>> from clicksearch import *' > README.md.test
+	@echo '>>> from clicksearch import *' >> README.md.test
 	@# Turn off standalone_mode so launching the command doesn't sys.exit
 	@echo '>>> ModelBase._standalone_mode = False' >> README.md.test
 	@# Copy the README.md content

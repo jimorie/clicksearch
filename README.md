@@ -229,6 +229,13 @@ Dolor Sit Amet
 Total count: 2
 ```
 
+```pycon
+>>> MyTextModel.cli('--name "b]d r[g}x" --regex', reader=reader)
+Usage: ...
+
+Error: Invalid value for '--name': Invalid regular expression
+```
+
 ### Number
 
 `Number` fields support numeric values and implement a single filter that allows basic comparisons with the field value. In the example below the option will be given the default name `--value`. The supported comparison operators are: `==` (the default), `!=`, `<`, `<=`, `>` and `>=`.
@@ -269,6 +276,13 @@ Dolor Sit Amet
 Value: 2
 
 Total count: 1
+```
+
+```pycon
+>>> MyNumberModel.cli('--value "X"', reader=reader)
+Usage: ...
+
+Error: Invalid value for '--value': X
 ```
 
 #### Specials
@@ -339,44 +353,6 @@ Ingredients: bread,cheese
 Total count: 1
 ```
 
-### Flag
-
-`Flag` fields represent boolean "Yes" or "No" values. A value of `1`, `"1"` or `True` are treated as "Yes", otherwise it's a "No".
-
-```python
-class Person(ModelBase):
-    name = Text()
-    alive = Flag()
-
-def people(options: dict):
-    yield {"name": "Elvis", "alive": 1}
-    yield {"name": "Elizabeth", "alive": 0}
-```
-
-```pycon
->>> Person.cli('', reader=people)
-Elvis: Alive.
-Elizabeth: Non-Alive.
-
-Total count: 2
-```
-
-```pycon
->>> Person.cli('--alive', reader=people)
-Elvis
-Alive: Yes
-
-Total count: 1
-```
-
-```pycon
->>> Person.cli('--non-alive', reader=people)
-Elizabeth
-Alive: No
-
-Total count: 1
-```
-
 ### Choice
 
 `Choice` fields behave as `Text` fields but have a defined set of valid values. Prefix arguments are automatically completed to the valid choice.
@@ -411,6 +387,51 @@ Total count: 1
 >>> Person.cli('--gender f', reader=people)
 Elizabeth
 Gender: Female
+
+Total count: 1
+```
+
+```pycon
+>>> Person.cli('--gender foo', reader=people)
+Usage: ...
+
+Error: Invalid value for '--gender': Valid choices are: Female, Male, Other
+```
+
+### Flag
+
+`Flag` fields represent boolean "Yes" or "No" values. A value of `1`, `"1"` or `True` are treated as "Yes", otherwise it's a "No". `Flag` fields implement two filters, one to test for "Yes" values and one for "No" values, the latter prefixed with "non-".
+
+```python
+class Person(ModelBase):
+    name = Text()
+    alive = Flag()
+
+def people(options: dict):
+    yield {"name": "Elvis", "alive": 1}
+    yield {"name": "Elizabeth", "alive": 0}
+```
+
+```pycon
+>>> Person.cli('', reader=people)
+Elvis: Alive.
+Elizabeth: Non-Alive.
+
+Total count: 2
+```
+
+```pycon
+>>> Person.cli('--alive', reader=people)
+Elvis
+Alive: Yes
+
+Total count: 1
+```
+
+```pycon
+>>> Person.cli('--non-alive', reader=people)
+Elizabeth
+Alive: No
 
 Total count: 1
 ```
