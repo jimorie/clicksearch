@@ -766,7 +766,10 @@ Total count: 2
 
 #### `implied`
 
-A dict of related field filters that are implied by filtering on this field.
+A string specifying a set of default filters to apply when this field is used.
+The syntax for this string is the same as if the options were given on the
+command line. The default filters are only applied if the targeted field does
+not have any filters set.
 
 ```python
 class Species(ModelBase):
@@ -776,8 +779,9 @@ class Species(ModelBase):
         keyname="type",
         optname="type",
         realname="Type",
+        inclusive=True,
     )
-    gestation_period = Number(implied={'animal_type': 'Mammal'}, optname="gp")
+    gestation_period = Number(implied="--type Mammal", optname="gp")
 
 def reader(options: dict):
     yield {'name': 'Human', 'type': 'Mammal', 'gestation_period': 280}
@@ -796,6 +800,53 @@ Type: Mammal
 Gestation Period: 65
 
 Total count: 1
+```
+
+```pycon
+>>> Species.cli('--sort gp', reader=reader)
+Cat: Mammal. 65 Gestation Period.
+Human: Mammal. 280 Gestation Period.
+
+Total count: 2
+```
+
+```pycon
+>>> Species.cli('--group gp', reader=reader)
+[ 65 Gestation Period ]
+Cat: Mammal. 65 Gestation Period.
+
+[ 280 Gestation Period ]
+Human: Mammal. 280 Gestation Period.
+
+Total count: 2
+```
+
+```pycon
+>>> Species.cli('--show gp', reader=reader)
+Human: 280 Gestation Period.
+Cat: 65 Gestation Period.
+
+Total count: 2
+```
+
+```pycon
+>>> Species.cli('--count gp', reader=reader)
+
+[ Gestation Period counts ]
+280 Gestation Period: 1
+65 Gestation Period: 1
+
+Total count: 2
+```
+
+If `animal_type` is explicitly filtered then the implied `--type` is ignored:
+
+```pycon
+>>> Species.cli('--sort gp --type-isnt Mammal', reader=reader)
+Toad: Amphibian.
+Eagle: Bird. 0 Gestation Period.
+
+Total count: 2
 ```
 
 #### `styles`

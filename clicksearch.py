@@ -6,6 +6,7 @@ import itertools
 import json
 import operator
 import re
+import shlex
 import typing
 
 import click
@@ -135,6 +136,11 @@ class ClickSearchCommand(click.Command):
         super().__init__(*args, **kwargs)
         self.model = model
         self.reader = reader
+        self.parser: click.parser.OptionParser | None = None
+
+    def make_parser(self, ctx: click.Context) -> click.parser.OptionParser:
+        self.parser = super().make_parser(ctx)
+        return self.parser
 
     def format_options(self, ctx: click.Context, formatter: click.HelpFormatter):
         """
@@ -365,11 +371,11 @@ class ModelBase:
     def main(cls, ctx: ClickSearchContext, **options: Any):
         """Main program flow used by the CLI."""
 
+        # Add on any implied filters
+        cls.preprocess_implied(ctx, options)
+
         # Pre-process all the options
         cls.preprocess_filterdata(ctx.filterdata, options)
-
-        # Pre-process any implied filters
-        cls.preprocess_implied(options)
 
         # Set up an iterable over all the items
         if isinstance(ctx.command, ClickSearchCommand):
@@ -465,11 +471,34 @@ class ModelBase:
                 )
 
     @classmethod
-    def preprocess_implied(cls, options: dict):
-        """Call `FieldBase.preprocess_implied` on all fields."""
-        for field in cls.resolve_fields():
+    def preprocess_implied(cls, ctx: ClickSearchContext, options: dict):
+        """Add all "implied" filters for referenced fields to the filterdata."""
+        fields = set(ctx.filterdata)
+        fields.update(options["count"])
+        fields.update(options["sort"])
+        fields.update(options["group"])
+        fields.update(options["show"])
+        for field in fields:
             if field.implied:
-                field.preprocess_implied(options)
+                parsed, _, params = ctx.command.parser.parse_args(  # type: ignore
+                    shlex.split(field.implied)
+                )
+                for paramname, values in parsed.items():
+                    for param in params:
+                        if param.name == paramname:
+                            break
+                    else:
+                        continue
+                    if param.field not in ctx.filterdata:
+                        ctx.filterdata[param.field] = [
+                            (
+                                param,
+                                tuple(
+                                    param.field.convert(value, param, ctx)
+                                    for value in values
+                                ),
+                            )
+                        ]
 
     @classmethod
     def filter_items(
@@ -487,8 +516,6 @@ class ModelBase:
         `False`.
         """
         for field, fieldfilters in ctx.filterdata.items():
-            if not field.test_implied(item):
-                return False
             try:
                 value = field.fetch(item)
             except MissingField:
@@ -650,7 +677,7 @@ class FieldBase(click.ParamType):
         typename: str | None = None,
         verbosity: int = 0,
         standalone: bool | object = Undefined,
-        implied: dict | None = None,
+        implied: str | None = None,
         styles: dict | None = None,
     ):
         self.default = default
@@ -752,8 +779,8 @@ class FieldBase(click.ParamType):
         ctx: click.Context | None,
     ) -> Any:
         """
-        Converts an option argument `optarg` for this field and return the new
-        value. This calls `validate` and handles any `TypeError` or
+        Converts a filter argument `filterarg` for this field and return the
+        new value. This calls `validate` and handles any `TypeError` or
         `ValueError` raised by re-raising a `click.BadParameter` exception.
         """
         try:
@@ -766,25 +793,6 @@ class FieldBase(click.ParamType):
     ) -> Any:
         """Pre-processes a `filterarg` for an `opt` used as a filter for this field."""
         return filterarg
-
-    def preprocess_implied(self, options: dict):
-        """Resolve any string references to fields by name in `implied` data."""
-        if self.implied:
-            self.implied = {
-                getattr(self.owner, fieldname): filterarg
-                for fieldname, filterarg in self.implied.items()
-            }
-
-    def test_implied(self, item: Mapping) -> bool:
-        """Return `True` if `item` meets all `implied` criteria, otherwise `False`."""
-        if self.implied:
-            for field, filterarg in self.implied.items():
-                try:
-                    if field.fetch(item) != filterarg:
-                        return False
-                except MissingField:
-                    return False
-        return True
 
     def validate(self, value: Any) -> Any:
         """Validates `value` and return a possibly converted value."""
