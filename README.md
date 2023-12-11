@@ -22,7 +22,7 @@ From this simple model you can launch your CLI program by calling the `ModelBase
 
 ```pycon
 >>> MyModel.cli('--help')
-Usage: doctest.py [OPTIONS] [FILE]...
+Usage: ... [OPTIONS] [FILE]...
 
 Options:
   -v, --verbose  Show more data.
@@ -137,7 +137,7 @@ if __name__ == '__main__':
 
 ## Fields
 
-Fields are the objects used to compose your model. Clicksearch comes with number of basic field types built-in, but you can of course also define your own field type by subclassing from the `FieldBase` class (or from any other built-in field type).
+Fields are the objects used to compose your model. Clicksearch comes with a number of basic field types built-in, but you can of course also define your own field type by subclassing from the `FieldBase` class (or from any other built-in field type).
 
 ### Text
 
@@ -518,24 +518,9 @@ class Person(ModelBase):
 
 ```pycon
 >>> Person.cli('--help')
-Usage: doctest.py [OPTIONS] [FILE]...
+Usage: ...
 
-Options:
-  -v, --verbose  Show more data.
-  --brief        Show one line of data, regardless the level of verbose.
-  --long         Show multiple lines of data, regardless the level of verbose.
-  --show FIELD   Show given field only. Can be repeated to show multiple
-                 fields in given order.
-  --case         Use case sensitive filtering.
-  --exact        Use exact match filtering.
-  --regex        Use regular rexpressions when filtering.
-  --inclusive    Use inclusive filtering that expand the result rather than
-                 shrinking it.
-  --sort FIELD   Sort results by given field.
-  --group FIELD  Group results by given field.
-  --desc         Sort results in descending order.
-  --count FIELD  Print a breakdown of all values for given field.
-  --help         Show this message and exit.
+Options: ...
 
 Field filters:
   --name TEXT   Filter on matching name.
@@ -605,31 +590,16 @@ class MyModel(ModelBase):
     name = Text(optname="foo")
 
 def reader(options: dict):
-    yield {'foo': 'Lorem Ipsum'}
-    yield {'foo': 'Dolor Sit Amet'}
+    yield {'name': 'Lorem Ipsum'}
+    yield {'name': 'Dolor Sit Amet'}
 ```
 
 ```pycon
 >>> MyModel.cli('--help', reader=reader)
-Usage: doctest.py [OPTIONS]
-<BLANKLINE>
-Options:
-  -v, --verbose  Show more data.
-  --brief        Show one line of data, regardless the level of verbose.
-  --long         Show multiple lines of data, regardless the level of verbose.
-  --show FIELD   Show given field only. Can be repeated to show multiple
-                 fields in given order.
-  --case         Use case sensitive filtering.
-  --exact        Use exact match filtering.
-  --regex        Use regular rexpressions when filtering.
-  --inclusive    Use inclusive filtering that expand the result rather than
-                 shrinking it.
-  --sort FIELD   Sort results by given field.
-  --group FIELD  Group results by given field.
-  --desc         Sort results in descending order.
-  --count FIELD  Print a breakdown of all values for given field.
-  --help         Show this message and exit.
-<BLANKLINE>
+Usage: ...
+
+Options: ...
+
 Field filters:
   --foo TEXT  Filter on matching name.
 ...
@@ -651,25 +621,10 @@ def reader(options: dict):
 
 ```pycon
 >>> MyModel.cli('--help', reader=reader)
-Usage: doctest.py [OPTIONS]
-<BLANKLINE>
-Options:
-  -v, --verbose  Show more data.
-  --brief        Show one line of data, regardless the level of verbose.
-  --long         Show multiple lines of data, regardless the level of verbose.
-  --show FIELD   Show given field only. Can be repeated to show multiple
-                 fields in given order.
-  --case         Use case sensitive filtering.
-  --exact        Use exact match filtering.
-  --regex        Use regular rexpressions when filtering.
-  --inclusive    Use inclusive filtering that expand the result rather than
-                 shrinking it.
-  --sort FIELD   Sort results by given field.
-  --group FIELD  Group results by given field.
-  --desc         Sort results in descending order.
-  --count FIELD  Print a breakdown of all values for given field.
-  --help         Show this message and exit.
-<BLANKLINE>
+Usage: ...
+
+Options: ...
+
 Field filters:
   --name TEXT  Filter on matching foo.
 ...
@@ -691,25 +646,10 @@ def reader(options: dict):
 
 ```pycon
 >>> MyModel.cli('--help', reader=reader)
-Usage: doctest.py [OPTIONS]
-<BLANKLINE>
-Options:
-  -v, --verbose  Show more data.
-  --brief        Show one line of data, regardless the level of verbose.
-  --long         Show multiple lines of data, regardless the level of verbose.
-  --show FIELD   Show given field only. Can be repeated to show multiple
-                 fields in given order.
-  --case         Use case sensitive filtering.
-  --exact        Use exact match filtering.
-  --regex        Use regular rexpressions when filtering.
-  --inclusive    Use inclusive filtering that expand the result rather than
-                 shrinking it.
-  --sort FIELD   Sort results by given field.
-  --group FIELD  Group results by given field.
-  --desc         Sort results in descending order.
-  --count FIELD  Print a breakdown of all values for given field.
-  --help         Show this message and exit.
-<BLANKLINE>
+Usage: ...
+
+Options: ...
+
 Field filters:
   --name FOO  Filter on matching name.
 ...
@@ -831,8 +771,13 @@ A dict of related field filters that are implied by filtering on this field.
 ```python
 class Species(ModelBase):
     name = Text()
-    type = Choice(['Mammal', 'Fish', 'Bird', 'Reptile', 'Amphibian'])
-    gestation_period = Number(implied={'type': 'Mammal'})
+    animal_type = Choice(
+        ['Mammal', 'Fish', 'Bird', 'Reptile', 'Amphibian'],
+        keyname="type",
+        optname="type",
+        realname="Type",
+    )
+    gestation_period = Number(implied={'animal_type': 'Mammal'}, optname="gp")
 
 def reader(options: dict):
     yield {'name': 'Human', 'type': 'Mammal', 'gestation_period': 280}
@@ -841,8 +786,11 @@ def reader(options: dict):
     yield {'name': 'Toad', 'type': 'Amphibian'}
 ```
 
+The "Eagle" and the "Toad" are excluded from the output because the `--gp` option implies `--type Mammal`:
+
+
 ```pycon
->>> Species.cli('--gestation-period "<100"', reader=reader)
+>>> Species.cli('--gp "<100"', reader=reader)
 Cat
 Type: Mammal
 Gestation Period: 65
