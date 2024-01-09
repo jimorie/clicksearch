@@ -821,7 +821,11 @@ class Species(ModelBase):
         realname="Type",
         inclusive=True,
     )
-    gestation_period = Number(implied="--type Mammal", optname="gp")
+    gestation_period = Number(
+        implied="--type Mammal",
+        optname="gp",
+        prelabeled=True,
+    )
 
 def reader(options: dict):
     yield {'name': 'Human', 'type': 'Mammal', 'gestation_period': 280}
@@ -844,27 +848,27 @@ Total count: 1
 
 ```pycon
 >>> Species.cli('--sort gp', reader=reader)
-Cat: Mammal. 65 Gestation Period.
-Human: Mammal. 280 Gestation Period.
+Cat: Mammal. Gestation Period 65.
+Human: Mammal. Gestation Period 280.
 
 Total count: 2
 ```
 
 ```pycon
 >>> Species.cli('--group gp', reader=reader)
-[ 65 Gestation Period ]
-Cat: Mammal. 65 Gestation Period.
+[ Gestation Period 65 ]
+Cat: Mammal. Gestation Period 65.
 
-[ 280 Gestation Period ]
-Human: Mammal. 280 Gestation Period.
+[ Gestation Period 280 ]
+Human: Mammal. Gestation Period 280.
 
 Total count: 2
 ```
 
 ```pycon
 >>> Species.cli('--show gp', reader=reader)
-Human: 280 Gestation Period.
-Cat: 65 Gestation Period.
+Human: Gestation Period 280.
+Cat: Gestation Period 65.
 
 Total count: 2
 ```
@@ -873,8 +877,8 @@ Total count: 2
 >>> Species.cli('--count gp', reader=reader)
 
 [ Gestation Period counts ]
-280 Gestation Period: 1
-65 Gestation Period: 1
+Gestation Period 280: 1
+Gestation Period 65: 1
 
 Total count: 2
 ```
@@ -884,7 +888,7 @@ If `animal_type` is explicitly filtered then the implied `--type` is ignored:
 ```pycon
 >>> Species.cli('--sort gp --type-isnt Mammal', reader=reader)
 Toad: Amphibian.
-Eagle: Bird. 0 Gestation Period.
+Eagle: Bird. Gestation Period 0.
 
 Total count: 2
 ```
