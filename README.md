@@ -762,11 +762,9 @@ Total count: 2
 
 #### `unlabeled`
 
-Set to `True` to use the values for this field as-is, without its `realname`
-label.
+Set to `True` to use the values for this field as-is, without its `realname` label.
 
-By default this is set to `True` for the first field defined on a model,
-otherwise `False`.
+By default this is set to `True` for the first field defined on a model, otherwise `False`.
 
 ```python
 class Philosopher(ModelBase):
@@ -811,10 +809,7 @@ Total count: 2
 
 #### `implied`
 
-A string specifying a set of default filters to apply when this field is used.
-The syntax for this string is the same as if the options were given on the
-command line. The default filters are only applied if the targeted field does
-not have any filters set.
+A string specifying a set of default filters to apply when this field is used. The syntax for this string is the same as if the options were given on the command line. The implied filters are only applied if the targeted field does not have any filters set.
 
 ```python
 class Species(ModelBase):
