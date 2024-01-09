@@ -2,7 +2,11 @@ VENV_DIR = venv
 VERSION := $(shell python3 -c 'from importlib.metadata import version; print(version("clicksearch"))')
 SRC = clicksearch.py
 
-dist:
+venv:
+	python3 -m venv ${VENV_DIR}
+	${VENV_DIR}/bin/pip install --upgrade .[dev]
+
+dist: venv
 	${VENV_DIR}/bin/pip wheel --no-deps --wheel-dir dist .
 
 version:
@@ -18,20 +22,20 @@ clean:
 	rm -rf __pycache__
 	rm README.md.test
 
-upload:
+upload: venv
 	${VENV_DIR}/bin/twine upload dist/*
 
 release: clean README.md version dist upload
 
-format:
-	black ${SRC}
+format: venv
+	${VENV_DIR}/bin/black ${SRC}
 
-lint:
-	ruff ${SRC}
-	black --check ${SRC}
-	mypy --check-untyped-defs ${SRC}
+lint: venv
+	${VENV_DIR}/bin/ruff ${SRC}
+	${VENV_DIR}/bin/black --check ${SRC}
+	${VENV_DIR}/bin/mypy --check-untyped-defs ${SRC}
 
-test:
+test: venv
 	@# Redirect stderr to stdout
 	@echo '>>> import sys; sys.stderr = sys.stdout' > README.md.test
 	@# Automagically import everything
@@ -53,7 +57,3 @@ test:
 	@sed -i '' 's/^```$$/\n```/g' README.md.test
 	@# Run doctest!
 	${VENV_DIR}/bin/python -m doctest -o NORMALIZE_WHITESPACE -o ELLIPSIS ${SRC} README.md.test
-
-venv:
-	python3 -m venv ${VENV_DIR}
-	${VENV_DIR}/bin/pip install --upgrade .[dev]
