@@ -283,14 +283,14 @@ Price: 7
 Total count: 1
 ```
 
-#### Label Prefix
+#### Prefix Labels
 
-Since `Number` fields include a label in the brief output format, the `labelprefix` option can be used to control whether that label should go before or after the value.
+Since `Number` fields include a label in the brief output format, the `prelabeled` option can be used to control whether that label should go before or after the value.
 
 ```python
 class Person(ModelBase):
     name = Text()
-    age = Number(labelprefix=True)
+    age = Number(prelabeled=True)
 ```
 
 ```pycon
@@ -760,7 +760,7 @@ Pride and Prejudice: Jane Austen.
 Total count: 2
 ```
 
-#### `labelless`
+#### `unlabeled`
 
 Set to `True` to use the values for this field as-is, without its `realname`
 label.
@@ -770,8 +770,8 @@ otherwise `False`.
 
 ```python
 class Philosopher(ModelBase):
-    name = Text(labelless=False)
-    quote = Text(labelless=True)
+    name = Text(unlabeled=False)
+    quote = Text(unlabeled=True)
 
 def philosophers(options: dict):
     yield {'name': 'Aristotle', 'quote': '"Quality is not an act, it is a habit."'}

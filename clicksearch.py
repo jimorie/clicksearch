@@ -226,8 +226,8 @@ class ModelBase:
             field.styles = {}
         field.styles.setdefault("fg", "cyan")
         field.styles.setdefault("bold", True)
-        if field.labelless is Undefined:
-            field.labelless = True
+        if field.unlabeled is Undefined:
+            field.unlabeled = True
 
     @classmethod
     def resolve_fields(cls) -> Iterable[FieldBase]:
@@ -676,7 +676,7 @@ class FieldBase(click.ParamType):
         helpname: str | None = None,
         typename: str | None = None,
         verbosity: int = 0,
-        labelless: bool | object = Undefined,
+        unlabeled: bool | object = Undefined,
         implied: str | None = None,
         styles: dict | None = None,
     ):
@@ -689,7 +689,7 @@ class FieldBase(click.ParamType):
         self.helpname = helpname
         self.typename = typename
         self.verbosity = verbosity
-        self.labelless = labelless
+        self.unlabeled = unlabeled
         self.implied = implied
         self.styles = styles
 
@@ -842,7 +842,7 @@ class FieldBase(click.ParamType):
         field.
         """
         value = self.format_value(value)
-        if self.labelless is True:
+        if self.unlabeled is True:
             return value
         return f"{self.realname}: {value}"
 
@@ -888,10 +888,16 @@ class Number(FieldBase):
         (">", operator.gt),
     ]
 
-    def __init__(self, *args, specials: list[str] | None = None, labelprefix : bool = False, **kwargs):
+    def __init__(
+        self,
+        *args,
+        specials: list[str] | None = None,
+        prelabeled: bool = False,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self.specials = specials
-        self.labelprefix = labelprefix
+        self.prelabeled = prelabeled
 
     def get_metavar_help(self):
         return (
@@ -976,9 +982,9 @@ class Number(FieldBase):
         """Returns a brief formatted version of `value` for this field."""
         if value is None:
             return f"No {self.realname}"
-        if self.labelless is True:
+        if self.unlabeled is True:
             return str(value)
-        if self.labelprefix:
+        if self.prelabeled:
             return f"{self.realname} {value}"
         return f"{value} {self.realname}"
 
