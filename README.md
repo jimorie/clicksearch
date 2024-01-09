@@ -760,31 +760,51 @@ Pride and Prejudice: Jane Austen.
 Total count: 2
 ```
 
-#### `standalone`
+#### `labelless`
 
-Set to `True` to have `FieldBase.format_long` return values for this field
-as-is, without its `realname` label.
+Set to `True` to use the values for this field as-is, without its `realname`
+label.
 
 By default this is set to `True` for the first field defined on a model,
 otherwise `False`.
 
 ```python
 class Philosopher(ModelBase):
-    name = Text(standalone=False)
-    quote = Text(standalone=True)
+    name = Text(labelless=False)
+    quote = Text(labelless=True)
 
-def reader(options: dict):
+def philosophers(options: dict):
     yield {'name': 'Aristotle', 'quote': '"Quality is not an act, it is a habit."'}
     yield {'name': 'Pascal', 'quote': '"You always admire what you don\'t understand."'}
 ```
 
 ```pycon
->>> Philosopher.cli('-v', reader=reader)
+>>> Philosopher.cli('-v', reader=philosophers)
 Name: Aristotle
 "Quality is not an act, it is a habit."
 
 Name: Pascal
 "You always admire what you don't understand."
+
+Total count: 2
+```
+
+This should also affect labels used in the brief format, e.g. for `Number` fields.
+
+```python
+class Toplist(ModelBase):
+    name = Text()
+    rank = Number(unlabeled=True)
+
+def philosophers(options: dict):
+    yield {'name': 'Aristotle', 'rank': 1}
+    yield {'name': 'Pascal', 'rank': 2}
+```
+
+```pycon
+>>> Toplist.cli('', reader=philosophers)
+Aristotle: 1.
+Pascal: 2.
 
 Total count: 2
 ```

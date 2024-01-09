@@ -226,8 +226,8 @@ class ModelBase:
             field.styles = {}
         field.styles.setdefault("fg", "cyan")
         field.styles.setdefault("bold", True)
-        if field.standalone is Undefined:
-            field.standalone = True
+        if field.labelless is Undefined:
+            field.labelless = True
 
     @classmethod
     def resolve_fields(cls) -> Iterable[FieldBase]:
@@ -676,7 +676,7 @@ class FieldBase(click.ParamType):
         helpname: str | None = None,
         typename: str | None = None,
         verbosity: int = 0,
-        standalone: bool | object = Undefined,
+        labelless: bool | object = Undefined,
         implied: str | None = None,
         styles: dict | None = None,
     ):
@@ -689,7 +689,7 @@ class FieldBase(click.ParamType):
         self.helpname = helpname
         self.typename = typename
         self.verbosity = verbosity
-        self.standalone = standalone
+        self.labelless = labelless
         self.implied = implied
         self.styles = styles
 
@@ -842,7 +842,7 @@ class FieldBase(click.ParamType):
         field.
         """
         value = self.format_value(value)
-        if self.standalone is True:
+        if self.labelless is True:
             return value
         return f"{self.realname}: {value}"
 
@@ -976,6 +976,8 @@ class Number(FieldBase):
         """Returns a brief formatted version of `value` for this field."""
         if value is None:
             return f"No {self.realname}"
+        if self.labelless is True:
+            return str(value)
         if self.labelprefix:
             return f"{self.realname} {value}"
         return f"{value} {self.realname}"
