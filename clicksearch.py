@@ -888,9 +888,10 @@ class Number(FieldBase):
         (">", operator.gt),
     ]
 
-    def __init__(self, *args, specials: list[str] | None = None, **kwargs):
+    def __init__(self, *args, specials: list[str] | None = None, labelprefix : bool = False, **kwargs):
         super().__init__(*args, **kwargs)
         self.specials = specials
+        self.labelprefix = labelprefix
 
     def get_metavar_help(self):
         return (
@@ -975,6 +976,8 @@ class Number(FieldBase):
         """Returns a brief formatted version of `value` for this field."""
         if value is None:
             return f"No {self.realname}"
+        if self.labelprefix:
+            return f"{self.realname} {value}"
         return f"{value} {self.realname}"
 
 

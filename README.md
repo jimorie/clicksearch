@@ -283,6 +283,24 @@ Price: 7
 Total count: 1
 ```
 
+#### Label Prefix
+
+Since `Number` fields include a label in the brief output format, the `labelprefix` option can be used to control whether that label should go before or after the value.
+
+```python
+class Person(ModelBase):
+    name = Text()
+    age = Number(labelprefix=True)
+```
+
+```pycon
+>>> Person.cli('', reader=people)
+Alice Anderson: Age 42.
+Bob Balderson: Age 27.
+
+Total count: 2
+```
+
 ### DelimitedText
 
 `DelimitedText` fields behave like a list of `Text` fields, where each part is separated by a given `str` delimiter. Each part is then matched individually.
