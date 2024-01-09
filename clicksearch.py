@@ -686,8 +686,8 @@ class FieldBase(click.ParamType):
         self.keyname = keyname
         self.optname = optname
         self.realname = realname
-        self.helpname = helpname or realname and realname.lower()
-        self.typename = typename or realname and realname.upper()
+        self.helpname = helpname
+        self.typename = typename
         self.verbosity = verbosity
         self.standalone = standalone
         self.implied = implied
@@ -704,12 +704,12 @@ class FieldBase(click.ParamType):
         self.owner = owner
         if self.keyname is None:
             self.keyname = name
-        if self.optname is None:
-            self.optname = name.replace("_", "-")
-        if self.helpname is None:
-            self.helpname = name.replace("_", " ")
         if self.realname is None:
             self.realname = name.replace("_", " ").title()
+        if self.helpname is None:
+            self.helpname = self.realname.lower()
+        if self.optname is None:
+            self.optname = self.realname.lower().replace(" ", "-")
         owner.register_field(name, self)
 
     @classmethod
