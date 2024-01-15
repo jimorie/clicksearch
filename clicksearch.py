@@ -1097,6 +1097,19 @@ class Flag(FieldBase):
 
     name = "FLAG"
 
+    def __init__(self, truename: str | None = None, falsename: str | None = None, **kwargs):
+        super().__init__(**kwargs)
+        self.truename = truename
+        self.falsename = falsename
+
+    def __set_name__(self, owner: type[ModelBase], name: str):
+        """Set up `truename` and `falsename` after we know our `realname`."""
+        super().__set_name__(owner, name)
+        if self.truename is None:
+            self.truename = self.realname
+        if self.falsename is None:
+            self.falsename = f"Non-{self.realname}"
+
     def validate(self, value: Any) -> Any:
         """Converts `value` to `True` or `False` and return it."""
         return value in (1, "1", True)
@@ -1121,7 +1134,7 @@ class Flag(FieldBase):
 
     def format_brief(self, value: Any) -> str:
         """Returns a brief formatted version of `value` for this field."""
-        return str(self.realname) if value else f"Non-{self.realname}"
+        return self.truename if value else self.falsename
 
     def format_long(self, value: Any) -> str:
         """

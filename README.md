@@ -414,6 +414,24 @@ Alive: No
 Total count: 1
 ```
 
+#### `truename` and `falsename`
+
+The `truename` and `falsename` options can be used to configure what is displayed when the `Flag` value is true or false, respectively.
+
+```python
+class Person(ModelBase):
+    name = Text()
+    alive = Flag(truename="Alive and kickin'", falsename="Dead as a dojo")
+```
+
+```pycon
+>>> Person.cli('', reader=people)
+Bob Balderson: Alive and kickin'.
+Alice Anderson: Dead as a dojo.
+
+Total count: 2
+```
+
 ### Field Parameters
 
 Parameters common to all field types.
