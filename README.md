@@ -85,8 +85,8 @@ Provide the reader to `Person.cli` with the `reader` keyword argument. Now you a
 
 ```pycon
 >>> Person.cli('', reader=people)
-Alice Anderson: 42 Age.
-Bob Balderson: 27 Age.
+Alice Anderson: Age 42.
+Bob Balderson: Age 27.
 
 Total count: 2
 ```
@@ -195,8 +195,8 @@ Total count: 1
 
 ```pycon
 >>> Person.cli('--name "\\b[blanderson]+\\b" --regex', reader=people)
-Alice Anderson: 42 Age.
-Bob Balderson: 27 Age.
+Alice Anderson: Age 42.
+Bob Balderson: Age 27.
 
 Total count: 2
 ```
@@ -224,8 +224,8 @@ Total count: 1
 
 ```pycon
 >>> Person.cli('--age "<50"', reader=people)
-Alice Anderson: 42 Age.
-Bob Balderson: 27 Age.
+Alice Anderson: Age 42.
+Bob Balderson: Age 27.
 
 Total count: 2
 ```
@@ -245,7 +245,7 @@ Usage: ...
 Error: Invalid value for '--age': X
 ```
 
-#### Specials
+#### `specials`
 
 `Number` fields can also be configured to accept non-numeric values with the `specials` parameter. Such special values only support direct equality comparison.
 
@@ -261,8 +261,8 @@ def gifts(options: dict):
 
 ```pycon
 >>> Gift.cli('', reader=gifts)
-Socks: 7 Price.
-Voucher: X Price.
+Socks: Price 7.
+Voucher: Price X.
 
 Total count: 2
 ```
@@ -283,22 +283,47 @@ Price: 7
 Total count: 1
 ```
 
-#### Prefix Labels
+#### Not A Number
 
-Since `Number` fields include a label in the brief output format, the `prelabeled` option can be used to control whether that label should go before or after the value.
+`Number` fields will handle values of `None` or the empty string `""` as a special case and display the value as missing.
 
 ```python
-class Person(ModelBase):
-    name = Text()
-    age = Number(prelabeled=True)
+def gifts(options: dict):
+    yield {'name': 'Socks', 'price': 7}
+    yield {'name': 'Voucher', 'price': 'X'}
+    yield {'name': 'Sweater', 'price': ''}
+    yield {'name': 'Trousers', 'price': None}
+    yield {'name': 'Gloves'}
 ```
 
 ```pycon
->>> Person.cli('', reader=people)
-Alice Anderson: Age 42.
-Bob Balderson: Age 27.
+>>> Gift.cli('', reader=gifts)
+Socks: Price 7.
+Voucher: Price X.
+Sweater: No Price.
+Trousers: No Price.
+Gloves: 
 
-Total count: 2
+Total count: 5
+```
+
+```pycon
+>>> Gift.cli('-v', reader=gifts)
+Socks
+Price: 7
+
+Voucher
+Price: X
+
+Sweater
+Price:
+
+Trousers
+Price:
+
+Gloves
+
+Total count: 5
 ```
 
 ### DelimitedText
@@ -568,11 +593,11 @@ The name used to reference the field in command output. Defaults to a title-case
 ```python
 class Event(ModelBase):
     name = Text()
-    ISO8601 = Text(realname="Date")
+    ISO_8601 = Text(realname="Date")
 
 def events(options: dict):
-    yield {'name': 'Battle of Hastings', 'ISO8601': '1066-10-14T13:07:53+0000'}
-    yield {'name': '9/11', 'ISO8601': '2001-09-11T08:46:00-0500'}
+    yield {'name': 'Battle of Hastings', 'ISO_8601': '1066-10-14T13:07:53+0000'}
+    yield {'name': '9/11', 'ISO_8601': '2001-09-11T08:46:00-0500'}
 ```
 
 ```pycon
@@ -605,7 +630,7 @@ The name used to substitute the `{helpname}` variable in field filter help texts
 ```python
 class Event(ModelBase):
     name = Text()
-    ISO8601 = Text(helpname="date")
+    ISO_8601 = Text(helpname="date")
 ```
 
 
@@ -616,18 +641,18 @@ Usage: ...
 Options: ...
 
 Field filters:
-  --name    TEXT  Filter on matching name.
-  --iso8601 TEXT  Filter on matching date.
+  --name     TEXT  Filter on matching name.
+  --iso-8601 TEXT  Filter on matching date.
 ...
 ```
 
 ```pycon
 >>> Event.cli('-v', reader=events)
 Battle of Hastings
-Iso8601: 1066-10-14T13:07:53+0000
+Iso 8601: 1066-10-14T13:07:53+0000
 
 9/11
-Iso8601: 2001-09-11T08:46:00-0500
+Iso 8601: 2001-09-11T08:46:00-0500
 
 Total count: 2
 ```
@@ -639,7 +664,7 @@ The name used to substitute the `{optname}` variable in field filter arguments. 
 ```python
 class Event(ModelBase):
     name = Text()
-    ISO8601 = Text(optname="date")
+    ISO_8601 = Text(optname="date")
 ```
 
 
@@ -651,17 +676,17 @@ Options: ...
 
 Field filters:
   --name TEXT  Filter on matching name.
-  --date TEXT  Filter on matching iso8601.
+  --date TEXT  Filter on matching iso 8601.
 ...
 ```
 
 ```pycon
 >>> Event.cli('-v', reader=events)
 Battle of Hastings
-Iso8601: 1066-10-14T13:07:53+0000
+Iso 8601: 1066-10-14T13:07:53+0000
 
 9/11
-Iso8601: 2001-09-11T08:46:00-0500
+Iso 8601: 2001-09-11T08:46:00-0500
 
 Total count: 2
 ```
@@ -673,7 +698,7 @@ The name used in the help text for the argument type of this field. Defaults to 
 ```python
 class Event(ModelBase):
     name = Text()
-    ISO8601 = Text(typename="DATE")
+    ISO_8601 = Text(typename="DATE")
 ```
 
 ```pycon
@@ -683,18 +708,18 @@ Usage: ...
 Options: ...
 
 Field filters:
-  --name    TEXT  Filter on matching name.
-  --iso8601 DATE  Filter on matching iso8601.
+  --name     TEXT  Filter on matching name.
+  --iso-8601 DATE  Filter on matching iso 8601.
 ...
 ```
 
 ```pycon
 >>> Event.cli('-v', reader=events)
 Battle of Hastings
-Iso8601: 1066-10-14T13:07:53+0000
+Iso 8601: 1066-10-14T13:07:53+0000
 
 9/11
-Iso8601: 2001-09-11T08:46:00-0500
+Iso 8601: 2001-09-11T08:46:00-0500
 
 Total count: 2
 ```
@@ -805,26 +830,6 @@ Name: Pascal
 Total count: 2
 ```
 
-This should also affect labels used in the brief format, e.g. for `Number` fields.
-
-```python
-class Toplist(ModelBase):
-    name = Text()
-    rank = Number(unlabeled=True)
-
-def philosophers(options: dict):
-    yield {'name': 'Aristotle', 'rank': 1}
-    yield {'name': 'Pascal', 'rank': 2}
-```
-
-```pycon
->>> Toplist.cli('', reader=philosophers)
-Aristotle: 1.
-Pascal: 2.
-
-Total count: 2
-```
-
 #### `implied`
 
 A string specifying a set of default filters to apply when this field is used. The syntax for this string is the same as if the options were given on the command line. The implied filters are only applied if the targeted field does not have any filters set.
@@ -842,10 +847,9 @@ class Species(ModelBase):
     gestation_period = Number(
         implied="--type Mammal",
         optname="gp",
-        prelabeled=True,
     )
 
-def reader(options: dict):
+def species(options: dict):
     yield {'name': 'Human', 'type': 'Mammal', 'gestation_period': 280}
     yield {'name': 'Cat', 'type': 'Mammal', 'gestation_period': 65}
     yield {'name': 'Eagle', 'type': 'Bird', 'gestation_period': 0}
@@ -856,7 +860,7 @@ The "Eagle" and the "Toad" are excluded from the output because the `--gp` optio
 
 
 ```pycon
->>> Species.cli('--gp "<100"', reader=reader)
+>>> Species.cli('--gp "<100"', reader=species)
 Cat
 Type: Mammal
 Gestation Period: 65
@@ -865,7 +869,7 @@ Total count: 1
 ```
 
 ```pycon
->>> Species.cli('--sort gp', reader=reader)
+>>> Species.cli('--sort gp', reader=species)
 Cat: Mammal. Gestation Period 65.
 Human: Mammal. Gestation Period 280.
 
@@ -873,7 +877,7 @@ Total count: 2
 ```
 
 ```pycon
->>> Species.cli('--group gp', reader=reader)
+>>> Species.cli('--group gp', reader=species)
 [ Gestation Period 65 ]
 Cat: Mammal. Gestation Period 65.
 
@@ -884,7 +888,7 @@ Total count: 2
 ```
 
 ```pycon
->>> Species.cli('--show gp', reader=reader)
+>>> Species.cli('--show gp', reader=species)
 Human: Gestation Period 280.
 Cat: Gestation Period 65.
 
@@ -892,7 +896,7 @@ Total count: 2
 ```
 
 ```pycon
->>> Species.cli('--count gp', reader=reader)
+>>> Species.cli('--count gp', reader=species)
 
 [ Gestation Period counts ]
 Gestation Period 280: 1
@@ -904,7 +908,7 @@ Total count: 2
 If `animal_type` is explicitly filtered then the implied `--type` is ignored:
 
 ```pycon
->>> Species.cli('--sort gp --type-isnt Mammal', reader=reader)
+>>> Species.cli('--sort gp --type-isnt Mammal', reader=species)
 Toad: Amphibian.
 Eagle: Bird. Gestation Period 0.
 

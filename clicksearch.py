@@ -677,6 +677,7 @@ class FieldBase(click.ParamType):
         typename: str | None = None,
         verbosity: int = 0,
         unlabeled: bool | object = Undefined,
+        brief_format: str | None = None,
         implied: str | None = None,
         styles: dict | None = None,
     ):
@@ -690,6 +691,7 @@ class FieldBase(click.ParamType):
         self.typename = typename
         self.verbosity = verbosity
         self.unlabeled = unlabeled
+        self.brief_format = brief_format
         self.implied = implied
         self.styles = styles
 
@@ -834,7 +836,10 @@ class FieldBase(click.ParamType):
 
     def format_brief(self, value: Any) -> str:
         """Return a brief formatted version of `value` for this field."""
-        return self.format_value(value)
+        value = self.format_value(value)
+        if self.brief_format:
+            value = self.brief_format.format(name=self.realname, value=value)
+        return value
 
     def format_long(self, value: Any) -> str:
         """
@@ -891,13 +896,15 @@ class Number(FieldBase):
     def __init__(
         self,
         *args,
+        brief_format: str | None = None,
+        unlabeled: bool = False,
         specials: list[str] | None = None,
-        prelabeled: bool = False,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        if not brief_format and not unlabeled:
+            brief_format = '{name} {value}'
+        super().__init__(*args, brief_format=brief_format, unlabeled=unlabeled, **kwargs)
         self.specials = specials
-        self.prelabeled = prelabeled
 
     def get_metavar_help(self):
         return (
@@ -943,10 +950,10 @@ class Number(FieldBase):
           raised.
         """
         value = super().validate(value)
-        if value is None:
-            return None
         if self.specials and value in self.specials:
             return value
+        if value is None or value == '':
+            return None
         try:
             return int(value)
         except (ValueError, TypeError):
@@ -982,11 +989,7 @@ class Number(FieldBase):
         """Returns a brief formatted version of `value` for this field."""
         if value is None:
             return f"No {self.realname}"
-        if self.unlabeled is True:
-            return str(value)
-        if self.prelabeled:
-            return f"{self.realname} {value}"
-        return f"{value} {self.realname}"
+        return super().format_brief(value)
 
 
 class Text(FieldBase):
@@ -1159,10 +1162,6 @@ class Choice(Text):
         else:
             self.choices = {choice.lower(): choice for choice in choices}
         super().__init__(**kwargs)
-
-    def __set_name__(self, owner: type[ModelBase], name: str):
-        """Also update the `name` property for `Choice` instances."""
-        super().__set_name__(owner, name)
 
     def get_metavar(self, *_):
         if self.typename:
