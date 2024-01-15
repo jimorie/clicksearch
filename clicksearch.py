@@ -902,8 +902,10 @@ class Number(FieldBase):
         **kwargs,
     ):
         if not brief_format and not unlabeled:
-            brief_format = '{name} {value}'
-        super().__init__(*args, brief_format=brief_format, unlabeled=unlabeled, **kwargs)
+            brief_format = "{name} {value}"
+        super().__init__(
+            *args, brief_format=brief_format, unlabeled=unlabeled, **kwargs
+        )
         self.specials = specials
 
     def get_metavar_help(self):
@@ -952,7 +954,7 @@ class Number(FieldBase):
         value = super().validate(value)
         if self.specials and value in self.specials:
             return value
-        if value is None or value == '':
+        if value is None or value == "":
             return None
         try:
             return int(value)
@@ -990,6 +992,28 @@ class Number(FieldBase):
         if value is None:
             return f"No {self.realname}"
         return super().format_brief(value)
+
+
+class Countable(Number):
+    """
+    Class for defining a countable field on a model. This differs from a
+    `Number` field only by how it is presented in the brief format. If the name
+    of the field is something you can put a count in front of, then it is
+    probably a `Countable` rather than a `Number`.
+    """
+
+    def __init__(
+        self,
+        *args,
+        brief_format: str | None = None,
+        unlabeled: bool = False,
+        **kwargs,
+    ):
+        if not brief_format and not unlabeled:
+            brief_format = "{value} {name}"
+        super().__init__(
+            *args, brief_format=brief_format, unlabeled=unlabeled, **kwargs
+        )
 
 
 class Text(FieldBase):
@@ -1100,7 +1124,9 @@ class Flag(FieldBase):
 
     name = "FLAG"
 
-    def __init__(self, truename: str | None = None, falsename: str | None = None, **kwargs):
+    def __init__(
+        self, truename: str | None = None, falsename: str | None = None, **kwargs
+    ):
         super().__init__(**kwargs)
         self.truename = truename
         self.falsename = falsename

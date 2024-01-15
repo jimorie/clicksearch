@@ -326,6 +326,30 @@ Gloves
 Total count: 5
 ```
 
+### Countable
+
+`Countable` differs from `Number` fields only in how they are displayed. If the name of the field is one that can have a count before it, then it is probably a `Countable` rather than a `Number`.
+
+
+```python
+class Inventory(ModelBase):
+    name = Text()
+    price = Number()
+    in_stock = Countable()
+
+def wines(options: dict):
+    yield {'name': 'Milk', 'price': 7, 'in_stock': 29}
+    yield {'name': 'Yoghurt', 'price': 11, 'in_stock': 15}
+```
+
+```pycon
+>>> Inventory.cli('', reader=wines)
+Milk: Price 7. 29 In Stock.
+Yoghurt: Price 11. 15 In Stock.
+
+Total count: 2
+```
+
 ### DelimitedText
 
 `DelimitedText` fields behave like a list of `Text` fields, where each part is separated by a given `str` delimiter. Each part is then matched individually.
@@ -733,7 +757,7 @@ class Book(ModelBase):
     title = Text()
     author = Text()
     author_sorted = Text(verbosity=2)
-    pages = Number(verbosity=1)
+    pages = Countable(verbosity=1)
 
 def books(options: dict):
     yield {'title': 'Moby Dick', 'author': 'Herman Melville', 'author_sorted': 'Melville, Herman', 'pages': 720}
