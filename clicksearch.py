@@ -316,13 +316,13 @@ class ModelBase:
             type=FieldChoice(fieldmap),
         )
         yield click.Option(
+            ["--desc"], is_flag=True, help="Sort results in descending order."
+        )
+        yield click.Option(
             ["--group"],
             help="Group results by given field.",
             multiple=True,
             type=FieldChoice(fieldmap),
-        )
-        yield click.Option(
-            ["--desc"], is_flag=True, help="Sort results in descending order."
         )
         yield click.Option(
             ["--count"],
@@ -393,7 +393,7 @@ class ModelBase:
         # Set print_func based on verbosity
         if options["verbose"] < 0:
             print_func = None
-        elif options["verbose"] and not options["brief"]:
+        elif options["long"] or (options["verbose"] and not options["brief"]):
             print_func = cls.print_long
         else:
             print_func = cls.print_brief
@@ -515,21 +515,23 @@ class ModelBase:
         Returns `True` if `item` passes all filter options used, otherwise
         `False`.
         """
+        inclusive = bool(options["inclusive"])
         for field, fieldfilters in ctx.filterdata.items():
             try:
                 value = field.fetch(item)
             except MissingField:
                 return False
-            any_or_all = any if field.inclusive or options["inclusive"] else all
-            if not any_or_all(
+            any_or_all = any if inclusive or field.inclusive else all
+            result = any_or_all(
                 any_or_all(
                     opt.filter_func(opt.field, filterarg, value, options)
                     for filterarg in filterargs
                 )
                 for opt, filterargs in fieldfilters
-            ):
-                return False
-        return True
+            )
+            if result is inclusive:
+                return result
+        return not inclusive
 
     @classmethod
     def sort_items(cls, items: Iterable[Mapping], options: dict) -> Iterable[Mapping]:
@@ -904,7 +906,7 @@ class Number(FieldBase):
         if not brief_format and not unlabeled:
             brief_format = "{name} {value}"
         super().__init__(
-            *args, brief_format=brief_format, unlabeled=unlabeled, **kwargs
+            *args, brief_format=brief_format, unlabeled=unlabeled, **kwargs  # type: ignore
         )
         self.specials = specials
 
@@ -1163,7 +1165,7 @@ class Flag(FieldBase):
 
     def format_brief(self, value: Any) -> str:
         """Returns a brief formatted version of `value` for this field."""
-        return self.truename if value else self.falsename
+        return self.truename if value else self.falsename  # type: ignore
 
     def format_long(self, value: Any) -> str:
         """

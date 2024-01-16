@@ -36,8 +36,8 @@ Options:
   --inclusive    Use inclusive filtering that expand the result rather than
                  shrinking it.
   --sort FIELD   Sort results by given field.
-  --group FIELD  Group results by given field.
   --desc         Sort results in descending order.
+  --group FIELD  Group results by given field.
   --count FIELD  Print a breakdown of all values for given field.
   --help         Show this message and exit.
 
@@ -92,17 +92,6 @@ Total count: 2
 ```
 
 ```pycon
->>> Person.cli('--verbose', reader=people)
-Alice Anderson
-Age: 42
-
-Bob Balderson
-Age: 27
-
-Total count: 2
-```
-
-```pycon
 >>> Person.cli('--age 27', reader=people)
 Bob Balderson
 Age: 27
@@ -135,84 +124,329 @@ if __name__ == '__main__':
 
 [DOCTEST_CONTINUE]::
 
+## Command Line Options
+
+These are the basic command line options available in all Clicksearch programs.
+
+To examplify the different use cases, the following model and reader will be used:
+
+```python
+class Employee(ModelBase):
+    name = Text()
+    title = Text()
+    gender = Choice(["Female", "Male", "Other"])
+    salary = Number()
+
+
+def employees(options: dict):
+    yield {
+        'name': 'Alice Anderson',
+        'title': 'Sales Director',
+        'salary': 4200,
+        'gender': 'Female',
+    }
+    yield {
+        'name': 'Bob Balderson',
+        'title': 'Sales Representative',
+        'salary': 2700,
+        'gender': 'Male',
+    }
+    yield {
+        'name': 'Charlotte Carlson',
+        'title': 'Sales Representative',
+        'salary': 2200,
+        'gender': 'Female',
+    }
+    yield {
+        'name': 'Totoro',
+        'title': 'Company Mascot',
+    }
+```
+
+### `-v`, `--verbose`
+
+The `--verbose` option is used to show more details of the resulting items. By default items are shown using the "brief" format, using a single line per item. Adding a level of verbose will switch to using the "long" format, using a single line per item field.
+
+See also the `verbosity` field parameter for further use cases of the `--verbose` option.
+
+```pycon
+>>> Employee.cli('--verbose', reader=employees)
+Alice Anderson
+Title: Sales Director
+Gender: Female
+Salary: 4200
+
+Bob Balderson
+Title: Sales Representative
+Gender: Male
+Salary: 2700
+
+Charlotte Carlson
+Title: Sales Representative
+Gender: Female
+Salary: 2200
+
+Totoro
+Title: Company Mascot
+
+Total count: 4
+```
+
+### `--brief`
+
+The `--brief` option forces the use of the "brief" format, using a single line per item, regardless of the level of verbose. This is mainly useful to ensure that the brief format is used also when a single item is found.
+
+```pycon
+>>> Employee.cli('--gender male --brief', reader=employees)
+Bob Balderson: Sales Representative. Male. Salary 2700.
+
+Total count: 1
+```
+
+### `--long`
+
+The `--long` option forces the use of the "long" format, using a single line per item field, regardless of the level of verbose.
+
+```pycon
+>>> Employee.cli('--long', reader=employees)
+Alice Anderson
+Title: Sales Director
+Gender: Female
+Salary: 4200
+
+Bob Balderson
+Title: Sales Representative
+Gender: Male
+Salary: 2700
+
+Charlotte Carlson
+Title: Sales Representative
+Gender: Female
+Salary: 2200
+
+Totoro
+Title: Company Mascot
+
+Total count: 4
+```
+
+### `--show`
+
+The `--show` option can be used to control what fields to display.
+
+```pycon
+>>> Employee.cli('--show gender --show salary', reader=employees)
+Alice Anderson: Female. Salary 4200.
+Bob Balderson: Male. Salary 2700.
+Charlotte Carlson: Female. Salary 2200.
+Totoro:
+
+Total count: 4
+```
+
+```pycon
+>>> Employee.cli('--show salary --show title --long', reader=employees)
+Alice Anderson
+Salary: 4200
+Title: Sales Director
+
+Bob Balderson
+Salary: 2700
+Title: Sales Representative
+
+Charlotte Carlson
+Salary: 2200
+Title: Sales Representative
+
+Totoro
+Title: Company Mascot
+
+Total count: 4
+```
+
+### `--case`
+
+The `--case` option makes the `Text` field filter case sensitive.
+
+```pycon
+>>> Employee.cli('--name "bob" --case', reader=employees)
+
+Total count: 0
+```
+
+```pycon
+>>> Employee.cli('--name "Bob" --case', reader=employees)
+Bob Balderson
+Title: Sales Representative
+Gender: Male
+Salary: 2700
+
+Total count: 1
+```
+
+### `--exact`
+
+The `--exact` option makes the `Text` field filter require a full match.
+
+```pycon
+>>> Employee.cli('--name "bob" --exact', reader=employees)
+
+Total count: 0
+```
+
+```pycon
+>>> Employee.cli('--name "bob balderson" --exact', reader=employees)
+Bob Balderson
+Title: Sales Representative
+Gender: Male
+Salary: 2700
+
+Total count: 1
+```
+
+### `--regex`
+
+The `--regex` option makes the `Text` field filter operate as a [regular expression](https://docs.python.org/3/library/re.html).
+
+```pycon
+>>> Employee.cli('--name "\\b[anderson]+\\b" --regex', reader=employees)
+Alice Anderson
+Title: Sales Director
+Gender: Female
+Salary: 4200
+
+Total count: 1
+```
+
+```pycon
+>>> Employee.cli('--name "\\b[blanderson]+\\b" --regex', reader=employees)
+Alice Anderson: Sales Director. Female. Salary 4200.
+Bob Balderson: Sales Representative. Male. Salary 2700.
+
+Total count: 2
+```
+
+```pycon
+>>> Employee.cli('--name "b]d r[g}x" --regex', reader=employees)
+Usage: ...
+
+Error: Invalid value for '--name': Invalid regular expression
+```
+
+### `--inclusive`
+
+The `--inclusve` option treats multiple uses of field filters as a [logical disjunction](https://en.wikipedia.org/wiki/Classical_logic) (OR logic), rather than a [logical conjunction](https://en.wikipedia.org/wiki/Logical_conjunction) (AND logic), which is the default.
+
+Without `--inclusive`, multiple uses of filters give fewer results:
+
+```pycon
+>>> Employee.cli('--gender female --title "sales rep" --brief', reader=employees)
+Charlotte Carlson: Sales Representative. Female. Salary 2200.
+
+Total count: 1
+```
+
+Compared to when `--inclusive` is used:
+
+```pycon
+>>> Employee.cli('--gender female --title "sales rep" --inclusive', reader=employees)
+Alice Anderson: Sales Director. Female. Salary 4200.
+Bob Balderson: Sales Representative. Male. Salary 2700.
+Charlotte Carlson: Sales Representative. Female. Salary 2200.
+
+Total count: 3
+```
+
+### `--sort`
+
+The `--sort` option controls the order in which resulting items are displayed.
+
+```pycon
+>>> Employee.cli('--sort salary', reader=employees)
+Totoro: Company Mascot.
+Charlotte Carlson: Sales Representative. Female. Salary 2200.
+Bob Balderson: Sales Representative. Male. Salary 2700.
+Alice Anderson: Sales Director. Female. Salary 4200.
+
+Total count: 4
+```
+
+```pycon
+>>> Employee.cli('--sort gender', reader=employees)
+Totoro: Company Mascot.
+Alice Anderson: Sales Director. Female. Salary 4200.
+Charlotte Carlson: Sales Representative. Female. Salary 2200.
+Bob Balderson: Sales Representative. Male. Salary 2700.
+
+Total count: 4
+```
+
+### `--desc`
+
+The `--desc` option switches the `--sort` and `--group` options to use descending order.
+
+```pycon
+>>> Employee.cli('--sort salary --desc', reader=employees)
+Alice Anderson: Sales Director. Female. Salary 4200.
+Bob Balderson: Sales Representative. Male. Salary 2700.
+Charlotte Carlson: Sales Representative. Female. Salary 2200.
+Totoro: Company Mascot.
+
+Total count: 4
+```
+
+### `--group`
+
+The `--group` option displays the resulting items in groups by the target field values.
+
+```pycon
+>>> Employee.cli('--group title', reader=employees)
+[ Company Mascot ]
+
+Totoro: Company Mascot.
+
+[ Sales Director ]
+
+Alice Anderson: Sales Director. Female. Salary 4200.
+
+[ Sales Representative ]
+
+Bob Balderson: Sales Representative. Male. Salary 2700.
+Charlotte Carlson: Sales Representative. Female. Salary 2200.
+
+Total count: 4
+```
+
+### `--count`
+
+The `--count` options adds a breakdown of all values for a given field.
+
+```pycon
+>>> Employee.cli('--count title', reader=employees)
+[ Title counts ]
+
+Sales Representative: 2
+Sales Director: 1
+Company Mascot: 1
+
+Total count: 4
+```
+
 ## Fields
 
 Fields are the objects used to compose your model. Clicksearch comes with a number of basic field types built-in, but you can of course also define your own field type by subclassing from the `FieldBase` class (or from any other built-in field type).
 
 ### Text
 
-`Text` fields support `str` values and implement a single filter option that matches any part of the field value. In the example below the option will be given the default name `--name`. The behavior of the `Text` field filter can then be further controlled with the `--case`, `--exact` and `--regex` options.
+`Text` fields support `str` values and implement a single filter option that matches any part of the field value.
 
-The examples below use the same model and reader from previous section.
-
-#### `--case`
-
-The `--case` option makes the `Text` field filter case sensitive.
-
-```pycon
->>> Person.cli('--name "bob" --case', reader=people)
-
-Total count: 0
-```
-
-```pycon
->>> Person.cli('--name "Bob" --case', reader=people)
-Bob Balderson
-Age: 27
-
-Total count: 1
-```
-
-#### `--exact`
-
-The `--exact` option makes the `Text` field filter require a full match.
-
-```pycon
->>> Person.cli('--name "bob" --exact', reader=people)
-
-Total count: 0
-```
-
-```pycon
->>> Person.cli('--name "bob balderson" --exact', reader=people)
-Bob Balderson
-Age: 27
-
-Total count: 1
-```
-
-#### `--regex`
-
-The `--regex` option makes the `Text` field filter operate as a [regular expression](https://docs.python.org/3/library/re.html).
-
-```pycon
->>> Person.cli('--name "\\b[anderson]+\\b" --regex', reader=people)
-Alice Anderson
-Age: 42
-
-Total count: 1
-```
-
-```pycon
->>> Person.cli('--name "\\b[blanderson]+\\b" --regex', reader=people)
-Alice Anderson: Age 42.
-Bob Balderson: Age 27.
-
-Total count: 2
-```
-
-```pycon
->>> Person.cli('--name "b]d r[g}x" --regex', reader=people)
-Usage: ...
-
-Error: Invalid value for '--name': Invalid regular expression
-```
+For examples of this field in use see any of the previous sections, and especially those of the `--case`, `--exact` and `--regex` command line options.
 
 ### Number
 
 `Number` fields support numeric values and implement a single filter that allows basic comparisons with the field value. In the example below the option will be given the default name `--age`. The supported comparison operators are: `==` (the default), `!=`, `<`, `<=`, `>` and `>=`.
 
-The examples below use the same model and reader from previous section.
+The examples below use the same `Person` model and reader from previous section.
 
 ```pycon
 >>> Person.cli('--age 42', reader=people)
@@ -302,7 +536,7 @@ Socks: Price 7.
 Voucher: Price X.
 Sweater: No Price.
 Trousers: No Price.
-Gloves: 
+Gloves:
 
 Total count: 5
 ```
@@ -328,7 +562,7 @@ Total count: 5
 
 ### Countable
 
-`Countable` differs from `Number` fields only in how they are displayed. If the name of the field is one that can have a count before it, then it is probably a `Countable` rather than a `Number`.
+`Countable` behave like `Number` fields but switch the label and value around in the brief format. If the name of the field is one that can have a count before it, then it is probably a `Countable` rather than a `Number`.
 
 
 ```python
@@ -382,7 +616,7 @@ Total count: 1
 
 ### Choice
 
-`Choice` fields behave as `Text` fields but have a defined set of valid values. Prefix arguments are automatically completed to the valid choice.
+`Choice` fields behave like `Text` fields but have a defined set of valid values. Prefix arguments are automatically completed to the valid choice.
 
 ```python
 class Person(ModelBase):
@@ -481,9 +715,9 @@ Alice Anderson: Dead as a dojo.
 Total count: 2
 ```
 
-### Field Parameters
+### FieldBase
 
-Parameters common to all field types.
+`FieldBase` is the base class of all other fields, and not generally intended for direct use in models. The parameters available on `FieldBase` and therefore all other fields are listed below.
 
 #### `default`
 
@@ -815,16 +1049,6 @@ Author: Herman Melville
 Pages: 720
 
 Total count: 1
-```
-
-Note that the `--brief` option prevents increased `verbose` levels:
-
-```pycon
->>> Book.cli('-vvv --brief', reader=books)
-Moby Dick: Herman Melville.
-Pride and Prejudice: Jane Austen.
-
-Total count: 2
 ```
 
 #### `unlabeled`
