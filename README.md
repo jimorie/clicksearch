@@ -744,41 +744,60 @@ Total count: 1
 
 Treat multiple uses of this field's filters as a [logical disjunction](https://en.wikipedia.org/wiki/Classical_logic) (OR logic), rather than a [logical conjunction](https://en.wikipedia.org/wiki/Logical_conjunction) (AND logic), which is the default.
 
-```python
-class Person(ModelBase):
-    name = Text()
-    gender = Choice(["Female", "Male", "Other"], inclusive=True)
+Using the example of `Employee` from above with a slightly updated model:
 
-def people(options: dict):
-    yield {"name": "Alice Anderson", "gender": "Female"}
-    yield {"name": "Bob Balderson", "gender": "Male"}
-    yield {"name": "Totoro", "gender": "Other"}
+```python
+class Employee(ModelBase):
+    name = Text()
+    title = Text(inclusive=True)
+    gender = Choice(["Female", "Male", "Other"], inclusive=True, default="Other")
+    salary = Number()
 ```
 
-Multiple use of `--name` gives fewer results.
+Multiple use of `--name` gives fewer results:
 
 ```pycon
->>> Person.cli('--name son', reader=people)
-Alice Anderson: Female.
-Bob Balderson: Male.
+>>> Employee.cli('--name erson', reader=employees)
+Alice Anderson: Sales Director. Female. Salary 4200.
+Bob Balderson: Sales Representative. Male. Salary 2700.
 
 Total count: 2
 ```
 
 ```pycon
->>> Person.cli('--name son --name ander', reader=people)
-Alice Anderson
-Gender: Female
+>>> Employee.cli('--name erson --name and --brief', reader=employees)
+Alice Anderson: Sales Director. Female. Salary 4200.
 
 Total count: 1
 ```
 
-But multiple uses of `--gender` gives more results, since it has `inclusive=True`.
+But multiple uses of `--gender` gives more results, since it has `inclusive=True`:
 
 ```pycon
->>> Person.cli('--gender other --gender male', reader=people)
-Bob Balderson: Male.
-Totoro: Other.
+>>> Employee.cli('--gender other --gender male', reader=employees)
+Bob Balderson: Sales Representative. Male. Salary 2700.
+Totoro: Company Mascot. Other.
+
+Total count: 2
+```
+
+Same with multiple use of `--title`:
+
+```pycon
+>>> Employee.cli('--title rep --title dir', reader=employees)
+Alice Anderson: Sales Director. Female. Salary 4200.
+Bob Balderson: Sales Representative. Male. Salary 2700.
+Charlotte Carlson: Sales Representative. Female. Salary 2200.
+
+Total count: 3
+```
+
+However, mixed use of `--gender` and `--title` are *not* mutually inclusive.
+
+```pycon
+>>> Employee.cli('--title rep --title dir --gender female', reader=employees)
+Alice Anderson: Sales Director. Female. Salary 4200.
+Charlotte Carlson: Sales Representative. Female. Salary 2200.
 
 Total count: 2
 ```
@@ -786,7 +805,6 @@ Total count: 2
 #### `skip_filters`
 
 Don't add the given filter option for this field.
-
 
 ```python
 class Person(ModelBase):
