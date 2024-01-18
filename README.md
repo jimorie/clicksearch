@@ -517,49 +517,6 @@ Price: 7
 Total count: 1
 ```
 
-#### Not A Number
-
-`Number` fields will handle values of `None` or the empty string `""` as a special case and display the value as missing.
-
-```python
-def gifts(options: dict):
-    yield {'name': 'Socks', 'price': 7}
-    yield {'name': 'Voucher', 'price': 'X'}
-    yield {'name': 'Sweater', 'price': ''}
-    yield {'name': 'Trousers', 'price': None}
-    yield {'name': 'Gloves'}
-```
-
-```pycon
->>> Gift.cli('', reader=gifts)
-Socks: Price 7.
-Voucher: Price X.
-Sweater: No Price.
-Trousers: No Price.
-Gloves:
-
-Total count: 5
-```
-
-```pycon
->>> Gift.cli('-v', reader=gifts)
-Socks
-Price: 7
-
-Voucher
-Price: X
-
-Sweater
-Price:
-
-Trousers
-Price:
-
-Gloves
-
-Total count: 5
-```
-
 ### Countable
 
 `Countable` behave like `Number` fields but switch the label and value around in the brief format. If the name of the field is one that can have a count before it, then it is probably a `Countable` rather than a `Number`.

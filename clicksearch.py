@@ -830,15 +830,21 @@ class FieldBase(click.ParamType):
         """
         return self.fetch(item)
 
-    def format_value(self, value: Any) -> str:
+    def format_value(self, value: Any) -> str | None:
         """Return a string representation of `value`."""
-        if value is None or value == "":
-            return ""
+        if value is None:
+            return self.format_null()
         return self.style(str(value))
+
+    def format_null(self) -> str | None:
+        """Return a string representation of a `None` value, if any."""
+        return None
 
     def format_brief(self, value: Any) -> str:
         """Return a brief formatted version of `value` for this field."""
         value = self.format_value(value)
+        if value is None:
+            return ""
         if self.brief_format:
             value = self.brief_format.format(name=self.realname, value=value)
         return value
@@ -849,6 +855,8 @@ class FieldBase(click.ParamType):
         field.
         """
         value = self.format_value(value)
+        if value is None:
+            return ""
         if self.unlabeled is True:
             return value
         return f"{self.realname}: {value}"
@@ -992,7 +1000,7 @@ class Number(FieldBase):
     def format_brief(self, value: Any) -> str:
         """Returns a brief formatted version of `value` for this field."""
         if value is None:
-            return f"No {self.realname}"
+            return ""
         return super().format_brief(value)
 
 
