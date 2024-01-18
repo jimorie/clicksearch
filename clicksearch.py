@@ -674,6 +674,7 @@ class FieldBase(click.ParamType):
         skip_filters: Iterable[Callable] | None = None,
         keyname: str | None = None,
         optname: str | None = None,
+        optalias: str | None = None,
         realname: str | None = None,
         helpname: str | None = None,
         typename: str | None = None,
@@ -688,6 +689,7 @@ class FieldBase(click.ParamType):
         self.skip_filters = skip_filters
         self.keyname = keyname
         self.optname = optname
+        self.optalias = optalias
         self.realname = realname
         self.helpname = helpname
         self.typename = typename
@@ -749,9 +751,11 @@ class FieldBase(click.ParamType):
         """
         if not self.owner:
             raise RuntimeError("cannot resolve filter options without owner set")
+        is_first = True
         for filter_func, opt_kwargs in self.resolve_fieldfilters():
             new_kwargs = opt_kwargs.copy()
-            new_kwargs = self.format_opt_kwargs(new_kwargs)
+            new_kwargs = self.format_opt_kwargs(new_kwargs, use_optalias=is_first)
+            is_first = False
             callback = new_kwargs.pop("callback", None)
             yield self.owner._option_cls(
                 filter_func=filter_func,
@@ -762,12 +766,15 @@ class FieldBase(click.ParamType):
                 **new_kwargs,
             )
 
-    def format_opt_kwargs(self, opt_kwargs: dict) -> dict:
+    def format_opt_kwargs(self, opt_kwargs: dict, use_optalias: bool = False) -> dict:
         """Resolves format placeholders in all `opt_kwargs`."""
-        if "param_decls" in opt_kwargs:
-            opt_kwargs["param_decls"] = [
-                self.format_opt_arg(arg) for arg in opt_kwargs["param_decls"]
-            ]
+        if "param_decls" not in opt_kwargs:
+            opt_kwargs["param_decls"] = []
+        if use_optalias and self.optalias:
+            opt_kwargs["param_decls"] = (self.optalias, *opt_kwargs["param_decls"])
+        opt_kwargs["param_decls"] = [
+            self.format_opt_arg(arg) for arg in opt_kwargs["param_decls"]
+        ]
         if "help" in opt_kwargs:
             opt_kwargs["help"] = self.format_opt_arg(opt_kwargs["help"])
         return opt_kwargs

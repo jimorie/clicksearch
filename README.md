@@ -924,6 +924,42 @@ Iso 8601: 2001-09-11T08:46:00-0500
 Total count: 2
 ```
 
+#### `optalias`
+
+An alternative option name to use, typically when a short version is required.
+
+```python
+class Employee(ModelBase):
+    name = Text()
+    title = Text(inclusive=True)
+    gender = Choice(["Female", "Male", "Other"], inclusive=True, default="Other", optalias="-g")
+    salary = Number()
+```
+
+```pycon
+>>> Employee.cli('--help', reader=employees)
+Usage: ...
+
+Options: ...
+
+Field filters:
+  --name TEXT           Filter on matching name.
+  --title TEXT          Filter on matching title.
+  -g, --gender GENDER   Filter on matching gender.
+  --gender-isnt GENDER  Filter on non-matching gender.
+  --salary NUMBER       Filter on matching salary (number comparison).
+...
+```
+
+```pycon
+>>> Employee.cli('-g Other', reader=employees)
+Totoro
+Title: Company Mascot
+Gender: Other
+
+Total count: 1
+```
+
 #### `typename`
 
 The name used in the help text for the argument type of this field. Defaults to the `name` property of the field class.
