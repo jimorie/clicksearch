@@ -601,6 +601,8 @@ class ModelBase:
                         else:
                             value += ": "
                     first = False
+                elif value.endswith(".") or value.endswith(".\x1b[0m"):
+                    value += " "
                 else:
                     value += ". "
                 click.echo(value, nl=False)
