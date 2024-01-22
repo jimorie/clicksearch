@@ -1220,7 +1220,7 @@ class Choice(Text):
         return self.name
 
     def get_metavar_help(self):
-        return f"One of: {', '.join(sorted(set(self.choices.values())))}."
+        return f"One of: {', '.join(sorted(set(self.choices.keys())))}."
 
     def preprocess_filterarg(
         self, filterarg: Any, opt: click.Parameter, options: dict
@@ -1244,7 +1244,7 @@ class Choice(Text):
             if lowerchoice.startswith(optarg):
                 return choice
         self.fail(
-            f"Valid choices are: {', '.join(sorted(set(self.choices.values())))}",
+            f"Valid choices are: {', '.join(sorted(set(self.choices.keys())))}",
             param=param,
             ctx=ctx,
         )

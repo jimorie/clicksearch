@@ -613,7 +613,7 @@ Total count: 1
 >>> Person.cli('--gender foo', reader=people)
 Usage: ...
 
-Error: Invalid value for '--gender': Valid choices are: Female, Male, Other
+Error: Invalid value for '--gender': Valid choices are: female, male, other
 ```
 
 ### Flag
