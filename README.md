@@ -672,6 +672,45 @@ Alice Anderson: Dead as a dojo.
 Total count: 2
 ```
 
+### MarkupText
+
+`MarkupText` fields represent text fields that have HTML-like markup that
+should be parsed. HTML-like tags in the values will be replaced with ASCII
+styles before displayed.
+
+```python
+class WebPage(ModelBase):
+    url = Text(realname="URL")
+    body = MarkupText()
+
+def pages(options: dict):
+    yield {"url": "https://thecompany.com", "body": "<h1>The Company</h1>\nWelcome to our <b>company</b>!"}
+```
+
+```pycon
+>>> WebPage.cli('', reader=pages)
+https://thecompany.com
+Body: The Company
+Welcome to our company!
+
+Total count: 1
+```
+
+```pycon
+>>> WebPage.cli('--body "our company"', reader=pages)
+https://thecompany.com
+Body: The Company
+Welcome to our company!
+
+Total count: 1
+```
+
+```pycon
+>>> WebPage.cli('--body "<b>"', reader=pages)
+
+Total count: 0
+```
+
 ### FieldBase
 
 `FieldBase` is the base class of all other fields, and not generally intended for direct use in models. The parameters available on `FieldBase` and therefore all other fields are listed below.

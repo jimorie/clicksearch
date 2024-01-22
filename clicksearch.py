@@ -518,7 +518,7 @@ class ModelBase:
         inclusive = bool(options["inclusive"])
         for field, fieldfilters in ctx.filterdata.items():
             try:
-                value = field.fetch(item)
+                value = field.strip_value(field.fetch(item))
             except MissingField:
                 return False
             any_or_all = any if inclusive or field.inclusive else all
@@ -836,6 +836,10 @@ class FieldBase(click.ParamType):
         used for sorting.
         """
         return self.fetch(item)
+
+    def strip_value(self, value: Any) -> Any:
+        """Return a stripped string representation of `value` for testing against."""
+        return value
 
     def format_value(self, value: Any) -> str | None:
         """Return a string representation of `value`."""
@@ -1277,3 +1281,77 @@ class FieldChoice(Choice):
         """
         fieldname = super().convert(optarg, param, ctx)
         return self.fieldmap[fieldname]
+
+
+class MarkupText(Text):
+    """
+    Class for defining a text field with HTML-like markup on a model. All
+    HTML-like tags in the parsed values are replaced with ASCII styled text.
+    """
+
+    TAG_PATTERN = re.compile("<.*?>")
+
+    def __init__(self, *args, markupstyle: dict | None = None, **kwargs):
+        self.markupstyle = markupstyle or {}
+        super().__init__(*args, **kwargs)
+
+    def format_value(self, value: Any) -> str | None:
+        """
+        Return a string representation of `value`.
+
+        Examples:
+            >>> field = MarkupText()
+            >>> field.format_value("foo")
+            'foo\\x1b[0m'
+            >>> field.format_value("<b>foo</b>")
+            '\\x1b[1mfoo\\x1b[0m'
+            >>> field.format_value("xxx<b>foo</b>yyy")
+            'xxx\\x1b[0m\\x1b[1mfoo\\x1b[0myyy\\x1b[0m'
+            >>> field.format_value("xxx<i>foo</i>yyy")
+            'xxx\\x1b[0m\\x1b[35m\\x1b[1mfoo\\x1b[0myyy\\x1b[0m'
+            >>> field.format_value("xxx<b>foo")
+            'xxx\\x1b[0m\\x1b[1mfoo\\x1b[0m'
+            >>> field.format_value("xxx</b>foo")
+            'xxx\\x1b[0mfoo\\x1b[0m'
+        """
+        if value is None:
+            return self.format_null()
+        value = super().format_value(value)
+        return "".join(part for part in self.parse_markup(value))
+
+    @classmethod
+    def strip_value(cls, value: Any) -> Any:
+        """Return a version of `value` without HTML tags."""
+        if isinstance(value, str):
+            return cls.TAG_PATTERN.sub("", value)
+        return super(cls, MarkupText).strip_value(value)
+
+    def parse_markup(self, value: str) -> Iterable[str]:
+        """
+        Parse `value` as HTML and yield ASCII styled strings. Supports only
+        basic HTML and does not handle nested tags.
+        """
+        kwargs: dict[str, Any] = {}
+        beg = 0
+        while True:
+            end = value.find("<", beg)
+            if end >= 0:
+                if beg < end:
+                    yield click.style(value[beg:end], **kwargs)
+                beg = end
+                end = value.index(">", beg) + 1
+                tag = value[beg:end]
+                if tag == "<b>":
+                    kwargs["bold"] = True
+                elif tag == "</b>":
+                    kwargs.clear()
+                elif tag == "<i>":
+                    kwargs["fg"] = "magenta"
+                    kwargs["bold"] = True
+                elif tag == "</i>":
+                    kwargs.clear()
+                beg = end
+            else:
+                if beg < len(value):
+                    yield click.style(value[beg:], **kwargs)
+                break
