@@ -528,13 +528,13 @@ class Inventory(ModelBase):
     price = Number()
     in_stock = Countable()
 
-def wines(options: dict):
+def products(options: dict):
     yield {'name': 'Milk', 'price': 7, 'in_stock': 29}
     yield {'name': 'Yoghurt', 'price': 11, 'in_stock': 15}
 ```
 
 ```pycon
->>> Inventory.cli('', reader=wines)
+>>> Inventory.cli('', reader=products)
 Milk: Price 7. 29 In Stock.
 Yoghurt: Price 11. 15 In Stock.
 
