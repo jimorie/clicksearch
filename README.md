@@ -517,16 +517,16 @@ Price: 7
 Total count: 1
 ```
 
-### Countable
+### Count
 
-`Countable` behave like `Number` fields but switch the label and value around in the brief format. If the name of the field is one that can have a count before it, then it is probably a `Countable` rather than a `Number`.
+`Count` behave like `Number` fields but switch the label and value around in the brief format. If the name of the field is one that can have a count before it, then it is probably a `Count` rather than a `Number`.
 
 
 ```python
 class Inventory(ModelBase):
     name = Text()
     price = Number()
-    in_stock = Countable()
+    in_stock = Count()
 
 def products(options: dict):
     yield {'name': 'Milk', 'price': 7, 'in_stock': 29}
@@ -1041,7 +1041,7 @@ class Book(ModelBase):
     title = Text()
     author = Text()
     author_sorted = Text(verbosity=2)
-    pages = Countable(verbosity=1)
+    pages = Count(verbosity=1)
 
 def books(options: dict):
     yield {'title': 'Moby Dick', 'author': 'Herman Melville', 'author_sorted': 'Melville, Herman', 'pages': 720}

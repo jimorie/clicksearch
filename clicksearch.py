@@ -13,7 +13,8 @@ import click
 
 
 if typing.TYPE_CHECKING:
-    from typing import Any, Callable, IO, Iterable, Iterator, Mapping
+    from collections.abc import Iterable, Sequence, Mapping, Iterator
+    from typing import Any, Callable, IO
 
 
 Undefined = object()
@@ -127,9 +128,9 @@ class ClickSearchContext(click.Context):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.filterdata: dict[
-            FieldBase, list[tuple[ClickSearchOption, Any]]
-        ] = collections.defaultdict(list)
+        self.fieldfilterargs: dict[
+            FieldBase, dict[ClickSearchOption, Sequence[Any]]
+        ] = collections.defaultdict(dict)
 
 
 class ClickSearchCommand(click.Command):
@@ -149,6 +150,7 @@ class ClickSearchCommand(click.Command):
         self.parser: click.parser.OptionParser | None = None
 
     def make_parser(self, ctx: click.Context) -> click.parser.OptionParser:
+        """Save the returned parser instance on `self`."""
         self.parser = super().make_parser(ctx)
         return self.parser
 
@@ -201,22 +203,24 @@ class ClickSearchOption(click.Option):
         self,
         *args,
         field: FieldBase,
-        filter_func: Callable,
+        func: Callable | None,
+        multiple: bool = True,
         **kwargs,
     ):
         kwargs["type"] = field
+        kwargs["multiple"] = multiple
         super(ClickSearchOption, self).__init__(*args, **kwargs)
         self.field = field
-        self.filter_func = filter_func
+        self.func = func
 
     def process_value(self, ctx: ClickSearchContext, value: Any) -> Any:  # type: ignore
         """
         In addition to processing the value, also register the use of this
-        option in `ctx.filterdata`.
+        option in `ctx.fieldfilterargs`.
         """
         value = super().process_value(ctx, value)
         if not self.value_is_missing(value):
-            ctx.filterdata[self.field].append((self, value))
+            ctx.fieldfilterargs[self.field][self] = value if self.multiple else [value]
         return value
 
 
@@ -239,7 +243,9 @@ class ModelBase:
 
     @classmethod
     def register_first_field(cls, name: str, field: FieldBase):
-        """Set up specific setting for the first `field`registered on this model."""
+        """
+        Set up specific setting for the first `field` registered on this model.
+        """
         if field.styles is None:
             field.styles = {}
         field.styles.setdefault("fg", "cyan")
@@ -266,12 +272,13 @@ class ModelBase:
     @classmethod
     def resolve_fieldfilteroptions(cls) -> Iterable[ClickSearchOption]:
         """
-        Yields tuples with all `ClickSearchOption` object registered for the
+        Yields tuples with all `ClickSearchOption` objects registered for the
         fields on this model. Searches parent classes but skips overloaded
         field names.
         """
         for field in cls.resolve_fields():
-            yield from field.fieldfilteroptions.values()
+            if field.fieldfilteroptions:
+                yield from field.fieldfilteroptions
 
     @classmethod
     def make_command(cls, reader: Callable) -> click.Command:
@@ -379,7 +386,7 @@ class ModelBase:
         cls.preprocess_implied(ctx, options)
 
         # Pre-process all the options
-        cls.preprocess_filterdata(ctx.filterdata, options)
+        cls.preprocess_fieldfilterargs(ctx.fieldfilterargs, options)
 
         # Set up an iterable over all the items
         if isinstance(ctx.command, ClickSearchCommand):
@@ -459,50 +466,48 @@ class ModelBase:
         cls.print_counts(counts, item_count)
 
     @classmethod
-    def preprocess_filterdata(cls, filterdata: dict, options: dict):
+    def preprocess_fieldfilterargs(
+        cls,
+        fieldfilterargs: dict[FieldBase, dict[ClickSearchOption, Sequence[Any]]],
+        options: dict,
+    ):
         """
-        Pre-processes data in `filterdata` after we have received all options.
-        Actual pre-processing is delegated to `FieldBase.preprocess_filterarg`.
+        Pre-processes all data in `fieldfilterargs` after we have received all
+        options. Actual pre-processing is delegated to
+        `FieldBase.preprocess_filterarg`.
         """
-        for field, optargs in filterdata.items():
-            for i, (opt, filterargs) in enumerate(optargs):
-                optargs[i] = (
-                    opt,
-                    tuple(
-                        field.preprocess_filterarg(filterarg, opt, options)
-                        for filterarg in filterargs
-                    ),
-                )
+        for field, filteropts in fieldfilterargs.items():
+            for filteropt, filterargs in filteropts.items():
+                fieldfilterargs[field][filteropt] = [
+                    field.preprocess_filterarg(filterarg, filteropt, options)
+                    for filterarg in filterargs
+                ]
 
     @classmethod
     def preprocess_implied(cls, ctx: ClickSearchContext, options: dict):
-        """Add all "implied" filters for referenced fields to the filterdata."""
-        fields = set(ctx.filterdata)
+        """
+        Add all "implied" filters for referenced fields to
+        `ctx.fieldfilterargs`.
+        """
+        fields = set(ctx.fieldfilterargs)
         fields.update(options["count"])
         fields.update(options["sort"])
         fields.update(options["group"])
         fields.update(options["show"])
         for field in fields:
             if field.implied:
+                # Parse the implied filter
                 parsed, _, params = ctx.command.parser.parse_args(  # type: ignore
                     shlex.split(field.implied)
                 )
-                for paramname, values in parsed.items():
+                # Find the implied ClickSearchOption
+                for paramname, filterargs in parsed.items():
                     for param in params:
                         if param.name == paramname:
+                            # Check that the implied field is not filtered on
+                            if param.field not in ctx.fieldfilterargs:
+                                param.process_value(ctx, filterargs)
                             break
-                    else:
-                        continue
-                    if param.field not in ctx.filterdata:
-                        ctx.filterdata[param.field] = [
-                            (
-                                param,
-                                tuple(
-                                    param.field.convert(value, param, ctx)
-                                    for value in values
-                                ),
-                            )
-                        ]
 
     @classmethod
     def filter_items(
@@ -520,26 +525,27 @@ class ModelBase:
         `False`.
         """
         inclusive = bool(options["inclusive"])
-        for field, optargs in ctx.filterdata.items():
+        for field, filteropts in ctx.fieldfilterargs.items():
             try:
                 value = field.strip_value(field.fetch(item))
             except MissingField:
                 return False
             any_or_all = any if inclusive or field.inclusive else all
-            result = any_or_all(
-                any_or_all(
-                    opt.filter_func(opt.field, filterarg, value, options)
-                    for filterarg in filterargs
-                )
-                for opt, filterargs in optargs
-            )
-            if result is inclusive:
-                return result
+            for filteropt, filterargs in filteropts.items():
+                if filteropt.func:
+                    result = any_or_all(
+                        filteropt.func(field, filterarg, value, options)
+                        for filterarg in filterargs
+                    )
+                    if result is inclusive:
+                        return result
         return not inclusive
 
     @classmethod
     def sort_items(cls, items: Iterable[Mapping], options: dict) -> Iterable[Mapping]:
-        """Returns `items` sorted according to the --group and --sort `options`."""
+        """
+        Returns `items` sorted according to the --group and --sort `options`.
+        """
         sort_fields = options["group"] + options["sort"]
         if sort_fields:
 
@@ -641,24 +647,47 @@ class ModelBase:
         )
 
 
-def fieldfilter(*param_decls, **opt_kwargs):
+class fieldfilter:
     """
     Decorator to mark a `FieldBase` class method as a field filter.
     Type signature matches the `click.option` decorator.
     """
 
-    class decorator:
-        def __init__(self, func: Callable):
-            self.func = func
-            self.opt_kwargs = {"param_decls": param_decls, **opt_kwargs}
-            if "help" not in self.opt_kwargs and func.__doc__:
-                self.opt_kwargs["help"] = inspect.cleandoc(func.__doc__)
+    def __init__(self, *param_decls, **kwargs):
+        self.kwargs = {"param_decls": param_decls, **kwargs}
+        self.func: Callable | None = None  # Set when called the first time
 
-        def __set_name__(self, owner: type[FieldBase], name: str):
-            owner.register_fieldfilter(self.func, self.opt_kwargs)
-            setattr(owner, name, self.func)
+    def __set_name__(self, owner: type[FieldBase], name: str):
+        """Register this field filter to the `owner` field."""
+        owner.register_fieldfilter(self)
+        setattr(owner, name, self.func)
 
-    return decorator
+    def __call__(self, func: Callable):
+        """Register the decorated `func` as a field filter."""
+        self.func = func
+        if "help" not in self.kwargs and self.func.__doc__:
+            self.kwargs["help"] = inspect.cleandoc(self.func.__doc__)
+        return self
+
+    @property
+    def name(self):
+        """
+        Return the name of this fieldfilter, the same as the decorated
+        function.
+        """
+        return self.func.__name__ if self.func else None
+
+    def format_kwargs(self, optname: str, helpname: str, optalias: str | None) -> dict:
+        """Return a copy of the field filter kwargs with formatted parameters."""
+        kwargs = self.kwargs.copy()
+        if optalias:
+            kwargs["param_decls"] = (optalias, *kwargs["param_decls"])
+        kwargs["param_decls"] = tuple(
+            arg.format(optname=optname) for arg in kwargs["param_decls"]
+        )
+        if "help" in kwargs:
+            kwargs["help"] = kwargs["help"].format(helpname=helpname)
+        return kwargs
 
 
 class FieldBase(click.ParamType):
@@ -669,15 +698,15 @@ class FieldBase(click.ParamType):
 
     name: str
 
-    _fieldfilters: dict[
-        type[FieldBase], list[tuple[Callable, dict]]
-    ] = collections.defaultdict(list)
+    _fieldfilters: dict[type[FieldBase], list[fieldfilter]] = collections.defaultdict(
+        list
+    )
 
     def __init__(
         self,
         default: Any | type = MissingField,
         inclusive: bool = False,
-        skip_filters: Iterable[Callable] | None = None,
+        skip_filters: Iterable[fieldfilter] | None = None,
         keyname: str | None = None,
         optname: str | None = None,
         optalias: str | None = None,
@@ -704,17 +733,17 @@ class FieldBase(click.ParamType):
         self.brief_format = brief_format
         self.implied = implied
         self.styles = styles
-        self.fieldfilteroptions: dict[str, ClickSearchOption] = {}
 
         # Set when assigned to a model
-        self.owner: type[ModelBase] = None  # type: ignore
+        self.model: type[ModelBase] = None  # type: ignore
+        self.fieldfilteroptions: list[ClickSearchOption] = []
 
     def __set_name__(self, owner: type[ModelBase], name: str):
         """
-        Registers this `FieldBase` instance on a `ModelBase` class under the
-        given `name`.
+        Registers this `FieldBase` instance on a `owner` `ModelBase` class
+        under the given `name`.
         """
-        self.owner = owner
+        self.model = owner
         if self.keyname is None:
             self.keyname = name
         if self.realname is None:
@@ -723,43 +752,32 @@ class FieldBase(click.ParamType):
             self.helpname = self.realname.lower()
         if self.optname is None:
             self.optname = self.realname.lower().replace(" ", "-")
-        owner.register_field(name, self)
-        self.fieldfilteroptions.update(
-            (opt.name or name, opt) for opt in self.resolve_fieldfilteroptions()
-        )
-
-    @classproperty
-    def fieldfilters(cls) -> list[tuple[Callable, dict]]:
-        """Return all fieldfilters registered for this class."""
-        return cls._fieldfilters[cls]  # type: ignore
-
-    @classmethod
-    def register_fieldfilter(cls, filter_func: Callable, opt_kwargs: dict):
-        """
-        Registers a `filter_func` with `Option` kwargs `opt_kwargs`. Called by
-        the `fieldfilter` decorator.
-        """
-        cls.fieldfilters.append((filter_func, opt_kwargs))
-
-    def resolve_fieldfilteroptions(self) -> Iterable[ClickSearchOption]:
-        """
-        Yields `ClickSearchOption` objects for all filters defined with the
-        `fieldfilter` decorator on this field and its ancestors. Overloaded
-        filters are only yielded once.
-        """
-        is_first = True
-        for filter_func, opt_kwargs in self.resolve_fieldfilters():
-            new_kwargs = opt_kwargs.copy()
-            new_kwargs = self.format_opt_kwargs(new_kwargs, use_optalias=is_first)
-            is_first = False
-            yield self.owner._option_cls(
-                filter_func=filter_func,
-                field=self,
-                multiple=True,
-                **new_kwargs,
+        self.model.register_field(name, self)
+        # Create the Option objects for all field filters
+        for i, ffilter in enumerate(self.resolve_fieldfilters()):
+            self.fieldfilteroptions.append(
+                self.model._option_cls(
+                    func=ffilter.func,  # type: ignore
+                    field=self,
+                    **ffilter.format_kwargs(
+                        optname=self.optname,
+                        helpname=self.helpname,
+                        optalias=self.optalias if i == 0 else None,
+                    ),
+                )
             )
 
-    def resolve_fieldfilters(self) -> Iterable[tuple[Callable, dict]]:
+    @classmethod
+    def register_fieldfilter(cls, ffilter: fieldfilter):
+        """Registers a fieldfilter `ffilter`."""
+        cls.fieldfilters.append(ffilter)
+
+    @classproperty
+    def fieldfilters(cls) -> list[fieldfilter]:
+        """Return all field filters registered for this class."""
+        return cls._fieldfilters[cls]  # type: ignore
+
+    def resolve_fieldfilters(self) -> Iterable[fieldfilter]:
         """
         Yields all filters defined with the `fieldfilter` decorator on this
         field and its ancestors. Overloaded filters are only yielded once.
@@ -768,30 +786,13 @@ class FieldBase(click.ParamType):
         for ancestor in self.__class__.__mro__:
             if not issubclass(ancestor, FieldBase):
                 break
-            for filter_func, opt_kwargs in ancestor.fieldfilters:
-                if self.skip_filters and filter_func in self.skip_filters:
+            for ffilter in ancestor.fieldfilters:
+                if ffilter.name in seen:
                     continue
-                if filter_func.__name__ in seen:
+                if self.skip_filters and ffilter.func in self.skip_filters:
                     continue
-                yield filter_func, opt_kwargs
-                seen.add(filter_func.__name__)
-
-    def format_opt_kwargs(self, opt_kwargs: dict, use_optalias: bool = False) -> dict:
-        """Resolves format placeholders in all `opt_kwargs`."""
-        if "param_decls" not in opt_kwargs:
-            opt_kwargs["param_decls"] = []
-        if use_optalias and self.optalias:
-            opt_kwargs["param_decls"] = (self.optalias, *opt_kwargs["param_decls"])
-        opt_kwargs["param_decls"] = [
-            self.format_opt_arg(arg) for arg in opt_kwargs["param_decls"]
-        ]
-        if "help" in opt_kwargs:
-            opt_kwargs["help"] = self.format_opt_arg(opt_kwargs["help"])
-        return opt_kwargs
-
-    def format_opt_arg(self, arg: str) -> str:
-        """Resolves format placeholders in the single `arg`."""
-        return arg.format(optname=self.optname, helpname=self.helpname)
+                yield ffilter
+                seen.add(ffilter.name)
 
     def convert(
         self,
@@ -935,11 +936,18 @@ class Number(FieldBase):
         if not brief_format and not unlabeled:
             brief_format = "{name} {value}"
         super().__init__(
-            *args, brief_format=brief_format, unlabeled=unlabeled, **kwargs  # type: ignore
+            *args,
+            brief_format=brief_format,  # type: ignore
+            unlabeled=unlabeled,
+            **kwargs,
         )
         self.specials = specials
 
     def get_metavar_help(self):
+        """
+        Return a longer description of the option argument for this field used
+        in `--help`.
+        """
         return (
             "A number optionally prefixed by one of the supported comparison "
             f"operators: {', '.join(op[0] for op in self.operators)}. With "
@@ -966,9 +974,9 @@ class Number(FieldBase):
             op = operator.eq
         filterarg = super(Number, self).convert(filterarg, param, ctx)
 
-        def compare(x):
+        def compare(value):
             try:
-                return op(x, filterarg)
+                return op(value, filterarg)
             except TypeError:
                 return False
 
@@ -1025,12 +1033,12 @@ class Number(FieldBase):
         return super().format_brief(value)
 
 
-class Countable(Number):
+class Count(Number):
     """
     Class for defining a countable field on a model. This differs from a
     `Number` field only by how it is presented in the brief format. If the name
     of the field is something you can put a count in front of, then it is
-    probably a `Countable` rather than a `Number`.
+    probably a `Count` rather than a `Number`.
     """
 
     def __init__(
@@ -1053,6 +1061,10 @@ class Text(FieldBase):
     name = "TEXT"
 
     def get_metavar_help(self):
+        """
+        Return a longer description of the option argument for this field used
+        in `--help`.
+        """
         return (
             "A text partially matching the field value. The --case, --regex and "
             "--exact options can be applied. If prefixed with ! the match is negated."
@@ -1230,6 +1242,10 @@ class Choice(Text):
         return self.name
 
     def get_metavar_help(self):
+        """
+        Return a longer description of the option argument for this field used
+        in `--help`.
+        """
         return f"One of: {', '.join(sorted(set(self.choices.keys())))}."
 
     def preprocess_filterarg(
