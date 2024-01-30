@@ -1118,7 +1118,7 @@ class Text(FieldBase):
             result = value and arg == value
         else:
             result = value and arg in value
-        return result ^ negate
+        return bool(result) ^ negate
 
 
 class DelimitedText(Text):
