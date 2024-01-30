@@ -1213,6 +1213,28 @@ Eagle: Bird. Gestation Period 0.
 Total count: 2
 ```
 
+#### `redirect_args`
+
+Set to `True` to redirect all positional arguments to the **first** filter option for this field.
+
+```python
+class Employee(ModelBase):
+    name = Text(redirect_args=True)
+    title = Text(inclusive=True)
+    gender = Choice(["Female", "Male", "Other"], inclusive=True, default="Other")
+    salary = Number()
+```
+
+```pycon
+>>> Employee.cli('Bob', reader=employees)
+Bob Balderson
+Title: Sales Representative
+Gender: Male
+Salary: 2700
+
+Total count: 1
+```
+
 #### `styles`
 
 Set the styles with which to display values of this field, as passed on to [click.style](https://click.palletsprojects.com/en/latest/api/#click.style).

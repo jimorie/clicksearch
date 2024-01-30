@@ -224,6 +224,20 @@ class ClickSearchOption(click.Option):
         return value
 
 
+class ClickSearchRedirectArgument(click.Argument):
+    def __init__(self, redirect_to: click.Parameter):
+        self.redirect_to = redirect_to
+        super().__init__(
+            ["_arg"],
+            metavar=f"[{redirect_to.type.get_metavar(redirect_to)}]...",
+            nargs=-1,
+        )
+
+    def process_value(self, ctx: ClickSearchContext, value: Any) -> Any:  # type: ignore
+        """Redirect the use of this argument to the marked option."""
+        return self.redirect_to.process_value(ctx, value)
+
+
 class ModelBase:
     """Base class for models used to define the data items to operate on."""
 
@@ -270,15 +284,17 @@ class ModelBase:
                     seen.add(name)
 
     @classmethod
-    def resolve_fieldfilteroptions(cls) -> Iterable[ClickSearchOption]:
+    def resolve_fieldfilteroptions(cls) -> Iterable[click.Parameter]:
         """
         Yields tuples with all `ClickSearchOption` objects registered for the
         fields on this model. Searches parent classes but skips overloaded
         field names.
         """
         for field in cls.resolve_fields():
-            if field.fieldfilteroptions:
-                yield from field.fieldfilteroptions
+            for i, opt in enumerate(field.fieldfilteroptions):
+                if i == 0 and field.redirect_args:
+                    yield ClickSearchRedirectArgument(opt)
+                yield opt
 
     @classmethod
     def make_command(cls, reader: Callable) -> click.Command:
@@ -502,12 +518,13 @@ class ModelBase:
                 )
                 # Find the implied ClickSearchOption
                 for paramname, filterargs in parsed.items():
-                    for param in params:
-                        if param.name == paramname:
-                            # Check that the implied field is not filtered on
-                            if param.field not in ctx.fieldfilterargs:
-                                param.process_value(ctx, filterargs)
-                            break
+                    if filterargs:
+                        for param in params:
+                            if param.name == paramname:
+                                # Check that the implied field is not filtered on
+                                if param.field not in ctx.fieldfilterargs:
+                                    param.process_value(ctx, filterargs)
+                                break
 
     @classmethod
     def filter_items(
@@ -718,6 +735,7 @@ class FieldBase(click.ParamType):
         brief_format: str | None = None,
         implied: str | None = None,
         styles: dict | None = None,
+        redirect_args: bool = False,
     ):
         self.default = default
         self.inclusive = inclusive
@@ -733,6 +751,7 @@ class FieldBase(click.ParamType):
         self.brief_format = brief_format
         self.implied = implied
         self.styles = styles
+        self.redirect_args = redirect_args
 
         # Set when assigned to a model
         self.model: type[ModelBase] = None  # type: ignore
