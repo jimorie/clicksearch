@@ -1363,7 +1363,7 @@ class MarkupText(Text):
             end = value.find("<", beg)
             if end >= 0:
                 if beg < end:
-                    yield click.style(value[beg:end], **kwargs)
+                    yield click.style(value[beg:end], **(kwargs or self.styles or {}))
                 beg = end
                 end = value.index(">", beg) + 1
                 tag = value[beg:end]
@@ -1379,5 +1379,5 @@ class MarkupText(Text):
                 beg = end
             else:
                 if beg < len(value):
-                    yield click.style(value[beg:], **kwargs)
+                    yield click.style(value[beg:], **(kwargs or self.styles or {}))
                 break
