@@ -1178,7 +1178,7 @@ Total count: 1
 ```
 
 ```pycon
->>> Species.cli('--sort gp', reader=species)
+>>> Species.cli('--sort "gestation period"', reader=species)
 Cat: Mammal. Gestation Period 65.
 Human: Mammal. Gestation Period 280.
 
@@ -1186,7 +1186,7 @@ Total count: 2
 ```
 
 ```pycon
->>> Species.cli('--group gp', reader=species)
+>>> Species.cli('--group "gestation period"', reader=species)
 [ Gestation Period 65 ]
 Cat: Mammal. Gestation Period 65.
 
@@ -1197,7 +1197,7 @@ Total count: 2
 ```
 
 ```pycon
->>> Species.cli('--show gp', reader=species)
+>>> Species.cli('--show "gestation period"', reader=species)
 Human: Gestation Period 280.
 Cat: Gestation Period 65.
 
@@ -1205,7 +1205,7 @@ Total count: 2
 ```
 
 ```pycon
->>> Species.cli('--count gp', reader=species)
+>>> Species.cli('--count "gestation period"', reader=species)
 
 [ Gestation Period counts ]
 Gestation Period 280: 1
@@ -1217,7 +1217,7 @@ Total count: 2
 If `animal_type` is explicitly filtered then the implied `--type` is ignored:
 
 ```pycon
->>> Species.cli('--sort gp --type-isnt Mammal', reader=species)
+>>> Species.cli('--sort "gestation period" --type-isnt Mammal', reader=species)
 Toad: Amphibian.
 Eagle: Bird. Gestation Period 0.
 

@@ -314,7 +314,7 @@ class ModelBase:
     @classmethod
     def make_params(cls) -> Iterable[click.Parameter]:
         """Yields all standard options offered by the CLI."""
-        fieldmap = {field.optname: field for field in cls.resolve_fields()}
+        fieldmap = {field.helpname: field for field in cls.resolve_fields()}
         yield click.Option(["--verbose", "-v"], count=True, help="Show more data.")
         yield click.Option(
             ["--brief"],
