@@ -620,19 +620,18 @@ class ModelBase:
             except MissingField:
                 continue
             value = field.format_brief(value)
-            if value:
-                if first:
-                    if len(fields) > 1:
-                        if field.styles:
-                            value += click.style(": ", **field.styles)
-                        else:
-                            value += ": "
-                    first = False
-                elif value.endswith(".") or value.endswith(".\x1b[0m"):
-                    value += " "
-                else:
-                    value += ". "
-                click.echo(value, nl=False)
+            if first:
+                if len(fields) > 1:
+                    if field.styles:
+                        value += click.style(": ", **field.styles)
+                    else:
+                        value += ": "
+                first = False
+            elif value.endswith(".") or value.endswith(".\x1b[0m"):
+                value += " "
+            else:
+                value += ". "
+            click.echo(value, nl=False)
         click.echo()
 
     @classmethod
@@ -644,8 +643,7 @@ class ModelBase:
             except MissingField:
                 continue
             value = field.format_long(value)
-            if value:
-                click.echo(value)
+            click.echo(value)
         click.echo()
 
     @classmethod
@@ -850,6 +848,8 @@ class FieldBase(click.ParamType):
         """
         try:
             value = item[self.keyname]
+            if self.is_missing(value) and value != default:
+                raise MissingField(f"Value missing: {self.keyname}")
         except KeyError:
             if default is MissingField:
                 if self.default is MissingField:
@@ -859,6 +859,13 @@ class FieldBase(click.ParamType):
             else:
                 value = default
         return self.validate(value)
+
+    def is_missing(self, value: Any) -> bool:
+        """
+        Return `True` if the value of this field indicates that it is infact
+        missing, otherwise return `False`.
+        """
+        return value is None or value == ""
 
     def sortkey(self, item: Mapping) -> Any:
         """
