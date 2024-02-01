@@ -548,15 +548,16 @@ Total count: 2
 ```python
 class Recipe(ModelBase):
     name = Text()
-    ingredients = DelimitedText(delimiter=",")
+    ingredients = DelimitedText(delimiter=",", optname="ingredient")
 
 def recipes(options: dict):
     yield {"name": "Sandwich", "ingredients": "bread,cheese"}
     yield {"name": "Hamburger", "ingredients": "bread,meat,dressing"}
+    yield {"name": "Beef Wellington", "ingredients": "meat,ham,mushrooms,pastry"}
 ```
 
 ```pycon
->>> Recipe.cli('--ingredients bread --exact', reader=recipes)
+>>> Recipe.cli('--exact --ingredient bread', reader=recipes)
 Sandwich: bread,cheese.
 Hamburger: bread,meat,dressing.
 
@@ -564,9 +565,19 @@ Total count: 2
 ```
 
 ```pycon
->>> Recipe.cli('--ingredients cheese --exact', reader=recipes)
-Sandwich
-Ingredients: bread,cheese
+>>> Recipe.cli('--exact --ingredient mushrooms', reader=recipes)
+Beef Wellington
+Ingredients: meat,ham,mushrooms,pastry
+
+Total count: 1
+```
+
+This also works with negated text matching:
+
+```pycon
+>>> Recipe.cli('--exact --ingredient "!cheese" --ingredient "!pastry"', reader=recipes)
+Hamburger
+Ingredients: bread,meat,dressing
 
 Total count: 1
 ```

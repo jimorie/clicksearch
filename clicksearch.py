@@ -1175,7 +1175,8 @@ class DelimitedText(Text):
         Returns `True` if `arg` matches any part of the separated `value`,
         depending on `options`, otherwise `False`.
         """
-        return any(
+        any_or_all = all if arg.startswith("!") and not arg.startswith("!!") else any
+        return any_or_all(
             super(DelimitedText, self).filter_text(arg, part, options)
             for part in self.parts(value)
         )
