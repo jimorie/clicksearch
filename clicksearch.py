@@ -1372,7 +1372,7 @@ class MarkupText(Text):
         """
         if value is None:
             return self.format_null()
-        value = super().format_value(value)
+        value = Text.format_value(self, value)
         return "".join(part for part in self.parse_markup(value))
 
     @classmethod
@@ -1380,7 +1380,7 @@ class MarkupText(Text):
         """Return a version of `value` without HTML tags."""
         if isinstance(value, str):
             return cls.TAG_PATTERN.sub("", value)
-        return super(cls, MarkupText).strip_value(value)
+        return Text.strip_value(cls, value)
 
     def parse_markup(self, value: str) -> Iterable[str]:
         """
