@@ -547,7 +547,7 @@ class ModelBase:
         inclusive = bool(options["inclusive"])
         for field, filteropts in ctx.fieldfilterargs.items():
             try:
-                value = field.strip_value(field.fetch(item))
+                value = field.fetch(item)
             except MissingField:
                 return False
             any_or_all = any if inclusive or field.inclusive else all
@@ -876,10 +876,6 @@ class FieldBase(click.ParamType):
         used for sorting.
         """
         return self.fetch(item)
-
-    def strip_value(self, value: Any) -> Any:
-        """Return a stripped string representation of `value` for testing against."""
-        return value
 
     def format_value(self, value: Any) -> str | None:
         """Return a string representation of `value`."""
@@ -1313,7 +1309,7 @@ class Choice(Text):
     @fieldfilter("--{optname}-isnt", help="Filter on non-matching {helpname}.")
     def filter_text_isnt(self, arg: Any, value: Any, options: dict) -> bool:
         """Return `False` if `arg` equals `value`, otherwise `True`."""
-        return arg != value
+        return not self.filter_text(arg, value, options)
 
 
 class FieldChoice(Choice):
@@ -1372,7 +1368,7 @@ class MarkupText(Text):
         """
         if value is None:
             return self.format_null()
-        value = Text.format_value(self, value)
+        value = super().format_value( value)
         return "".join(part for part in self.parse_markup(value))
 
     @classmethod
@@ -1380,7 +1376,11 @@ class MarkupText(Text):
         """Return a version of `value` without HTML tags."""
         if isinstance(value, str):
             return cls.TAG_PATTERN.sub("", value)
-        return Text.strip_value(cls, value)
+        return value
+
+    @fieldfilter("--{optname}", help="Filter on matching {helpname}.")
+    def filter_text(self, arg: Any, value: Any, options: dict) -> bool:
+        return super().filter_text(arg, self.strip_value(value), options)
 
     def parse_markup(self, value: str) -> Iterable[str]:
         """
