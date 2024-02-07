@@ -241,6 +241,8 @@ class ClickSearchRedirectArgument(click.Argument):
 class ModelBase:
     """Base class for models used to define the data items to operate on."""
 
+    __version__: str | None = None
+
     _standalone_mode = True
     _command_name: str = "Base command"
     _command_cls: type[ClickSearchCommand] = ClickSearchCommand
@@ -309,6 +311,7 @@ class ModelBase:
             cmdobj.params.extend(reader.make_params())
         cmdobj.params.extend(cls.make_params())
         cmdobj.params.extend(cls.resolve_fieldfilteroptions())
+        click.version_option(cls.__version__)(cmdobj)
         return cmdobj
 
     @classmethod

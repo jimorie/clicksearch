@@ -39,6 +39,7 @@ Options:
   --desc         Sort results in descending order.
   --group FIELD  Group results by given field.
   --count FIELD  Print a breakdown of all values for given field.
+  --version      Show the version and exit.
   --help         Show this message and exit.
 
 Field filters:
