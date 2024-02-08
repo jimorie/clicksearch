@@ -609,7 +609,7 @@ class ModelBase:
     def collect_visible_fields(cls, options):
         """Yields all fields that should be considered for printing."""
         for field in cls.resolve_fields():
-            if options["verbose"] < field.verbosity:
+            if field.verbosity is None or options["verbose"] < field.verbosity:
                 continue
             yield field
 
@@ -731,7 +731,7 @@ class FieldBase(click.ParamType):
         realname: str | None = None,
         helpname: str | None = None,
         typename: str | None = None,
-        verbosity: int = 0,
+        verbosity: int | None = 0,
         unlabeled: bool | object = Undefined,
         brief_format: str | None = None,
         implied: str | None = None,
