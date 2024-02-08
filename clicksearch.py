@@ -652,13 +652,24 @@ class ModelBase:
     @classmethod
     def print_counts(cls, counts: dict[FieldBase, dict[str, int]], item_count: int):
         """Prints `counts` breakdowns."""
+        widths = {
+            value: len(click.unstyle(value))
+            for breakdown in counts.values()
+            for value in breakdown
+        }
+        colwidth = max(widths.values()) + 1 if widths else 0
         for field, breakdown in counts.items():
             click.secho(f"[ {field.realname} counts ]", fg="green", bold=True)
             click.echo()
             for value, count in sorted(
                 breakdown.items(), key=operator.itemgetter(1), reverse=True
             ):
-                click.echo(click.style(f"{value}: ", bold=True) + str(count))
+                click.echo(
+                    click.style(
+                        f"{value}:" + " " * (colwidth - widths[value]), bold=True
+                    )
+                    + str(count)
+                )
             click.echo()
         click.echo(
             click.style("Total count: ", fg="green", bold=True) + str(item_count)
@@ -1368,7 +1379,7 @@ class MarkupText(Text):
         """
         if value is None:
             return self.format_null()
-        value = super().format_value( value)
+        value = super().format_value(value)
         return "".join(part for part in self.parse_markup(value))
 
     @classmethod

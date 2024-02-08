@@ -427,8 +427,8 @@ The `--count` options adds a breakdown of all values for a given field.
 [ Title counts ]
 
 Sales Representative: 2
-Sales Director: 1
-Company Mascot: 1
+Sales Director:       1
+Company Mascot:       1
 
 Total count: 4
 ```
@@ -1209,8 +1209,9 @@ Total count: 2
 >>> Species.cli('--count "gestation period"', reader=species)
 
 [ Gestation Period counts ]
+
 Gestation Period 280: 1
-Gestation Period 65: 1
+Gestation Period 65:  1
 
 Total count: 2
 ```
