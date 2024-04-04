@@ -17,14 +17,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["ruff", "mypy", "black", "twine", "pip"]
+dev = ["ruff", "mypy", "black", "twine", "build", "hatchling"]
 
 [project.urls]
 "Homepage" = "https://github.com/jimorie/clicksearch"
 
-[tool.setuptools]
-package-data = {}
-
 [build-system]
-requires = ["setuptools>=43.0.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"

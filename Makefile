@@ -1,18 +1,17 @@
 VENV_DIR = venv
-VERSION := $(shell python3 -c 'from importlib.metadata import version; print(version("clicksearch"))')
 SRC = clicksearch.py
 
 venv:
 	python3 -m venv ${VENV_DIR}
+	${VENV_DIR}/bin/pip install --upgrade pip
 	${VENV_DIR}/bin/pip install --upgrade .[dev]
 
 dist: venv
-	${VENV_DIR}/bin/pip wheel --no-deps --wheel-dir dist .
+	${VENV_DIR}/bin/python -m build --no-isolation -o dist .
 
-version:
+version: venv
 	git add -u
-	git commit -m'Version ${VERSION}'
-	git tag v${VERSION}
+	VERSION=$$(${VENV_DIR}/bin/python -c 'from importlib.metadata import version; print(version("clicksearch"))'); git commit -m"Version $${VERSION}"; git tag "v$${VERSION}"
 	git push --tags origin master
 
 clean:
@@ -20,7 +19,7 @@ clean:
 	rm -rf dist
 	rm -rf clicksearch.egg-info
 	rm -rf __pycache__
-	rm README.md.test
+	rm -f README.md.test
 
 upload: venv
 	${VENV_DIR}/bin/twine upload dist/*
