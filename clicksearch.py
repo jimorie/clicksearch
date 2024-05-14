@@ -478,7 +478,7 @@ class ModelBase:
                     if current_group and not options["verbose"]:
                         click.echo()
                     header = " | ".join(
-                        field.format_brief(value)
+                        click.unstyle(field.format_brief(value))
                         for field, value in zip(group_fields, next_group)
                     )
                     click.secho(f"[ {header} ]", fg="yellow", bold=True)
