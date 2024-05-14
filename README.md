@@ -33,8 +33,10 @@ Options:
   --case         Use case sensitive filtering.
   --exact        Use exact match filtering.
   --regex        Use regular rexpressions when filtering.
-  --inclusive    Use inclusive filtering that expand the result rather than
-                 shrinking it.
+  --or FIELD     Treat multiple tests for given field with logical
+                 disjunction, i.e. OR-logic instead of AND-logic.
+  --inclusive    Treat multiple tests for different fields with logical
+                 disjunction, i.e. OR-logic instead of AND-logic.
   --sort FIELD   Sort results by given field.
   --desc         Sort results in descending order.
   --group FIELD  Group results by given field.
@@ -64,7 +66,7 @@ We can see from the `--help` output that we have a bunch of basic options, that 
 
 The next thing Clicksearch needs is a data source, called a _reader_. In Python terms the reader should be a `Callable[[Mapping], Iterable[Mapping]]` object. That is: it should be a callable object that takes a single `dict` argument (the parsed [Click](https://click.palletsprojects.com) parameters) and returns some sort of object that can be iterated over to generate the data objects that Clicksearch should work with.
 
-In its simplest form this can be a function that return, for instance, a `list`:
+In its simplest form this can be a function that returns, for instance, a `list`:
 
 ```python
 def people(options: dict):
@@ -334,11 +336,34 @@ Usage: ...
 Error: Invalid value for '--name': Invalid regular expression
 ```
 
+### `--or`
+
+The `--or` option treats multiple uses of a given field filter as a [logical disjunction](https://en.wikipedia.org/wiki/Classical_logic) (OR logic), rather than a [logical conjunction](https://en.wikipedia.org/wiki/Logical_conjunction) (AND logic), which is the default unless the field is specifically configured as a inclusive field.
+
+Without `--or`, multiple uses of the same field filter give fewer results.
+
+```pycon
+>>> Employee.cli('--name "C" --name "Anderson" --brief', reader=employees)
+Alice Anderson: Sales Director. Female. Salary 4200.
+
+Total count: 1
+```
+
+Compared to when `--or` is used:
+
+```pycon
+>>> Employee.cli('--name "C" --name "Anderson" --or name --brief', reader=employees)
+Alice Anderson: Sales Director. Female. Salary 4200.
+Charlotte Carlson: Sales Representative. Female. Salary 2200.
+
+Total count: 2
+```
+
 ### `--inclusive`
 
-The `--inclusve` option treats multiple uses of field filters as a [logical disjunction](https://en.wikipedia.org/wiki/Classical_logic) (OR logic), rather than a [logical conjunction](https://en.wikipedia.org/wiki/Logical_conjunction) (AND logic), which is the default.
+The `--inclusive` option treats multiple uses of different field filters as a [logical disjunction](https://en.wikipedia.org/wiki/Classical_logic) (OR logic), rather than a [logical conjunction](https://en.wikipedia.org/wiki/Logical_conjunction) (AND logic), which is the default.
 
-Without `--inclusive`, multiple uses of filters give fewer results:
+Without `--inclusive`, multiple uses of different filters give fewer results:
 
 ```pycon
 >>> Employee.cli('--gender female --title "sales rep" --brief', reader=employees)
@@ -725,7 +750,7 @@ Total count: 0
 
 ### FieldBase
 
-`FieldBase` is the base class of all other fields, and not generally intended for direct use in models. The parameters available on `FieldBase` and therefore all other fields are listed below.
+`FieldBase` is the base class of all other fields, and not generally intended for direct use in models. The parameters available on `FieldBase` -- and therefore all other fields -- are listed below.
 
 #### `default`
 

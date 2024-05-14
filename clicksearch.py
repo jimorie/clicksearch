@@ -346,11 +346,20 @@ class ModelBase:
             ["--regex"], is_flag=True, help="Use regular rexpressions when filtering."
         )
         yield click.Option(
+            ["--or"],
+            help=(
+                "Treat multiple tests for given field with logical disjunction, "
+                "i.e. OR-logic instead of AND-logic."
+            ),
+            multiple=True,
+            type=FieldChoice(fieldmap),
+        )
+        yield click.Option(
             ["--inclusive"],
             is_flag=True,
             help=(
-                "Use inclusive filtering that expand the result rather than "
-                "shrinking it."
+                "Treat multiple tests for different fields with logical disjunction, "
+                "i.e. OR-logic instead of AND-logic."
             ),
         )
         yield click.Option(
@@ -550,15 +559,17 @@ class ModelBase:
                 value = field.fetch(item)
             except MissingField:
                 return False
-            any_or_all = any if inclusive or field.inclusive else all
-            for filteropt, filterargs in filteropts.items():
-                if filteropt.func:
-                    result = any_or_all(
-                        filteropt.func(field, filterarg, value, options)
-                        for filterarg in filterargs
-                    )
-                    if result is inclusive:
-                        return result
+            any_or_all = any if field.inclusive or field in options["or"] else all
+            result = any_or_all(
+                any_or_all(
+                    filteropt.func(field, filterarg, value, options)
+                    for filterarg in filterargs
+                )
+                for filteropt, filterargs in filteropts.items()
+                if filteropt.func
+            )
+            if result is inclusive:
+                return result
         return not inclusive
 
     @classmethod
@@ -623,6 +634,8 @@ class ModelBase:
             except MissingField:
                 continue
             value = field.format_brief(value)
+            if not value:
+                continue
             if first:
                 if len(fields) > 1:
                     if field.styles:
@@ -1391,6 +1404,10 @@ class MarkupText(Text):
 
     @fieldfilter("--{optname}", help="Filter on matching {helpname}.")
     def filter_text(self, arg: Any, value: Any, options: dict) -> bool:
+        """
+        Return `True` if `arg` equals a stripped version of `value`, otherwise
+        `False`.
+        """
         return super().filter_text(arg, self.strip_value(value), options)
 
     def parse_markup(self, value: str) -> Iterable[str]:
