@@ -55,4 +55,4 @@ test: venv
 	@# Add an empty line at the end of code blocks for mark an end for doctest
 	@sed -i '' 's/^```$$/\n```/g' README.md.test
 	@# Run doctest!
-	${VENV_DIR}/bin/python -m doctest -o NORMALIZE_WHITESPACE -o ELLIPSIS ${SRC} README.md.test
+	COLUMNS=80 ${VENV_DIR}/bin/python -m doctest -o NORMALIZE_WHITESPACE -o ELLIPSIS ${SRC} README.md.test
