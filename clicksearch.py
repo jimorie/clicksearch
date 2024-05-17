@@ -899,7 +899,10 @@ class FieldBase(click.ParamType):
         Returns a comparable-type version of this field's value in `item`,
         used for sorting.
         """
-        return self.fetch(item)
+        try:
+            return self.fetch(item)
+        except MissingField:
+            return self.format_null()
 
     def format_value(self, value: Any) -> str | None:
         """Return a string representation of `value`."""
@@ -1242,7 +1245,10 @@ class Flag(FieldBase):
         for sorting. For `Flag` objects this is the inverse boolean of its
         value so that truthy values are ordered first.
         """
-        return not self.fetch(item)
+        try:
+            return not self.fetch(item)
+        except MissingField:
+            return False
 
     @fieldfilter("--{optname}", is_flag=True, help="Filter on {helpname}.")
     def filter_true(self, arg: Any, value: Any, options: dict) -> bool:
