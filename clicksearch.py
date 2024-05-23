@@ -1112,6 +1112,8 @@ class Text(FieldBase):
 
     name = "TEXT"
 
+    NEGATE_FLAG = 512
+
     def get_metavar_help(self):
         """
         Return a longer description of the option argument for this field used
@@ -1129,13 +1131,18 @@ class Text(FieldBase):
         Pre-processes `filterarg` for comparison against `Text` field
         values, depending on the `options` used.
         """
+        flags = 0
         if not options["case"]:
             filterarg = filterarg.lower()
         if options["regex"]:
+            if filterarg.startswith("!"):
+                if not filterarg.startswith("!!"):
+                    flags |= self.NEGATE_FLAG
+                filterarg = filterarg[1:]
             if options["exact"]:
                 filterarg = f"^{filterarg}$"
             try:
-                filterarg = re.compile(filterarg)
+                filterarg = re.compile(filterarg, flags)
             except re.error:
                 raise click.BadParameter("Invalid regular expression", param=opt)
         return filterarg
@@ -1157,19 +1164,20 @@ class Text(FieldBase):
         Returns `True` if `arg` matches `value`, depending on `options`,
         otherwise `False`.
         """
+        negate = False
         if not options["case"]:
             value = value.lower()
         if options["regex"]:
-            return bool(arg.search(value))
-        if arg.startswith("!"):
-            negate = not arg.startswith("!!")
-            arg = arg[1:]
+            result = bool(arg.search(value))
+            negate = bool(arg.flags & self.NEGATE_FLAG)
         else:
-            negate = False
-        if options["exact"]:
-            result = value and arg == value
-        else:
-            result = value and arg in value
+            if arg.startswith("!"):
+                negate = not arg.startswith("!!")
+                arg = arg[1:]
+            if options["exact"]:
+                result = value and arg == value
+            else:
+                result = value and arg in value
         return bool(result) ^ negate
 
 

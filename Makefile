@@ -30,7 +30,7 @@ format: venv
 	${VENV_DIR}/bin/black ${SRC}
 
 lint: venv
-	${VENV_DIR}/bin/ruff ${SRC}
+	${VENV_DIR}/bin/ruff check ${SRC}
 	${VENV_DIR}/bin/black --check ${SRC}
 	${VENV_DIR}/bin/mypy --check-untyped-defs ${SRC}
 
