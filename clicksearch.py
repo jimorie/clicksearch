@@ -83,11 +83,11 @@ class FileReader(ReaderBase):
                 with open(filename, "r") as fd:
                     yield fd
         except FileNotFoundError:
-            raise click.FileError(filename, "File not found")
+            raise click.FileError(filename, f"File not found: {filename}")
         except PermissionError:
-            raise click.FileError(filename, "Permission denied")
+            raise click.FileError(filename, f"Permission denied: {filename}")
         except IsADirectoryError:
-            raise click.FileError(filename, "Not a file")
+            raise click.FileError(filename, f"Not a file: {filename}")
         except OSError as exc:
             raise click.FileError(filename, str(exc))
 
