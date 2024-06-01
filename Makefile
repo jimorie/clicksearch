@@ -24,7 +24,7 @@ clean:
 upload: venv
 	${VENV_DIR}/bin/twine upload dist/*
 
-release: clean README.md version dist upload
+release: clean version dist upload
 
 format: venv
 	${VENV_DIR}/bin/black ${SRC}
