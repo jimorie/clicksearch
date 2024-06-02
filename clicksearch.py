@@ -761,6 +761,7 @@ class FieldBase(click.ParamType):
         implied: str | None = None,
         styles: dict | None = None,
         redirect_args: bool = False,
+        prefetch: Callable | None = None,
     ):
         self.default = default
         self.inclusive = inclusive
@@ -777,6 +778,7 @@ class FieldBase(click.ParamType):
         self.implied = implied
         self.styles = styles
         self.redirect_args = redirect_args
+        self.prefetch = prefetch
 
         # Set when assigned to a model
         self.model: type[ModelBase] = None  # type: ignore
@@ -874,6 +876,8 @@ class FieldBase(click.ParamType):
           exception if the value cannot be converted by that method.
         """
         try:
+            if self.prefetch:
+                item = self.prefetch(item)
             value = item[self.keyname]
             if self.is_missing(value) and value != default:
                 raise MissingField(f"Value missing: {self.keyname}")

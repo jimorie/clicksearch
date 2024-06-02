@@ -1273,6 +1273,33 @@ Salary: 2700
 Total count: 1
 ```
 
+#### `prefetch`
+
+Optional `Callable` that can potentially alter an `item` before `fetch` gets the field's value from it. Raise `MissingField` exception to skip the item.
+
+```python
+def can_have_salary(item):
+    if item["gender"] == "Male":
+        raise MissingField("Sorry boys!")
+    return item
+
+class Employee(ModelBase):
+    name = Text(redirect_args=True)
+    title = Text(inclusive=True)
+    gender = Choice(["Female", "Male", "Other"], inclusive=True, default="Other")
+    salary = Number(prefetch=can_have_salary)
+```
+
+```pycon
+>>> Employee.cli('', reader=employees)
+Alice Anderson: Sales Director. Female. Salary 4200.
+Bob Balderson: Sales Representative. Male.
+Charlotte Carlson: Sales Representative. Female. Salary 2200.
+Totoro: Company Mascot. Other.
+
+Total count: 4
+```
+
 #### `styles`
 
 Set the styles with which to display values of this field, as passed on to [click.style](https://click.palletsprojects.com/en/latest/api/#click.style).
