@@ -451,8 +451,10 @@ class ModelBase:
                 show_fields = options["show"]
             else:
                 show_fields = [title_field, *options["show"]]
+            show_explicit = True
         else:
             show_fields = list(cls.collect_visible_fields(options))
+            show_explicit = False
 
         # Set up counter
         item_count = 0
@@ -478,7 +480,7 @@ class ModelBase:
                     if current_group and not options["verbose"]:
                         click.echo()
                     header = " | ".join(
-                        click.unstyle(field.format_brief(value))
+                        click.unstyle(field.format_brief(value, show=True))
                         for field, value in zip(group_fields, next_group)
                     )
                     click.secho(f"[ {header} ]", fg="yellow", bold=True)
@@ -486,7 +488,7 @@ class ModelBase:
                     current_group = next_group
 
             # Print the item
-            print_func(show_fields, item, options)
+            print_func(show_fields, item, options, show=show_explicit)
 
         # Print breakdown counts
         if options["verbose"] == 0:
@@ -625,7 +627,7 @@ class ModelBase:
             yield field
 
     @classmethod
-    def print_brief(cls, fields: list[FieldBase], item: Mapping, options: dict):
+    def print_brief(cls, fields: list[FieldBase], item: Mapping, options: dict, show: bool = False):
         """Prints a one-line representation of `item`."""
         first = True
         for field in fields:
@@ -633,7 +635,7 @@ class ModelBase:
                 value = field.fetch(item)
             except MissingField:
                 continue
-            value = field.format_brief(value)
+            value = field.format_brief(value, show=show)
             if not value:
                 continue
             if first:
@@ -651,14 +653,14 @@ class ModelBase:
         click.echo()
 
     @classmethod
-    def print_long(cls, fields: list[FieldBase], item: Mapping, options: dict):
+    def print_long(cls, fields: list[FieldBase], item: Mapping, options: dict, show: bool = False):
         """Prints a multi-line representation of `item`."""
         for field in fields:
             try:
                 value = field.fetch(item)
             except MissingField:
                 continue
-            value = field.format_long(value)
+            value = field.format_long(value, show=show)
             click.echo(value)
         click.echo()
 
@@ -918,8 +920,11 @@ class FieldBase(click.ParamType):
         """Return a string representation of a `None` value, if any."""
         return None
 
-    def format_brief(self, value: Any) -> str:
-        """Return a brief formatted version of `value` for this field."""
+    def format_brief(self, value: Any, show: bool = False) -> str:
+        """
+        Return a brief formatted version of `value` for this field. If `show`
+        is `True`, the field was explicitly requested to be displayed.
+        """
         value = self.format_value(value)
         if value is None:
             return ""
@@ -927,10 +932,11 @@ class FieldBase(click.ParamType):
             value = self.brief_format.format(name=self.realname, value=value)
         return value
 
-    def format_long(self, value: Any) -> str:
+    def format_long(self, value: Any, show: bool = False) -> str:
         """
         Returns a long (single line) formatted version of `value` for this
-        field.
+        field. If `show` is `True`, the field was explicitly requested to be
+        displayed.
         """
         value = self.format_value(value)
         if value is None:
@@ -948,7 +954,7 @@ class FieldBase(click.ParamType):
     def count(self, item: Mapping, counts: collections.Counter):
         """Increments the `counts` count of this field's value in `item` by 1."""
         try:
-            counts[self.format_brief(self.fetch(item))] += 1
+            counts[self.format_brief(self.fetch(item), show=True)] += 1
         except MissingField:
             pass
 
@@ -1082,11 +1088,11 @@ class Number(FieldBase):
             return False
         return arg(value)
 
-    def format_brief(self, value: Any) -> str:
+    def format_brief(self, value: Any, show: bool = False) -> str:
         """Returns a brief formatted version of `value` for this field."""
         if value is None:
             return ""
-        return super().format_brief(value)
+        return super().format_brief(value, show=show)
 
 
 class Count(Number):
@@ -1276,11 +1282,11 @@ class Flag(FieldBase):
         """Returns the inversion of `value`."""
         return not self.filter_true(arg, value, options)
 
-    def format_brief(self, value: Any) -> str:
+    def format_brief(self, value: Any, show: bool = False) -> str:
         """Returns a brief formatted version of `value` for this field."""
         return self.truename if value else self.falsename  # type: ignore
 
-    def format_long(self, value: Any) -> str:
+    def format_long(self, value: Any, show: bool = False) -> str:
         """
         Returns a long (single line) formatted version of `value` for this
         field.
