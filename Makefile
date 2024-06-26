@@ -1,5 +1,6 @@
 VENV_DIR = venv
 SRC = clicksearch.py
+VERSION_SRC = pyproject.toml
 
 venv:
 	python3 -m venv ${VENV_DIR}
@@ -9,10 +10,14 @@ venv:
 dist: venv
 	${VENV_DIR}/bin/python -m build --no-isolation -o dist .
 
-version: venv
-	git add -u
-	VERSION=$$(${VENV_DIR}/bin/python -c 'from importlib.metadata import version; print(version("clicksearch"))'); git commit -m"Version $${VERSION}"; git tag "v$${VERSION}"
-	git push --tags origin master
+patch: venv
+	VERSION=$$(${VENV_DIR}/bin/bump --patch --reset ${VERSION_SRC}); git add -u; git commit -m"Version $${VERSION}"; git tag "v$${VERSION}"
+
+minor: venv
+	VERSION=$$(${VENV_DIR}/bin/bump --minor --reset ${VERSION_SRC}); git add -u; git commit -m"Version $${VERSION}"; git tag "v$${VERSION}"
+
+major: venv
+	VERSION=$$(${VENV_DIR}/bin/bump --major --reset ${VERSION_SRC}); git add -u; git commit -m"Version $${VERSION}"; git tag "v$${VERSION}"
 
 clean:
 	rm -rf build

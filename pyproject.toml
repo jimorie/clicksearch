@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["ruff", "mypy", "black", "twine", "build", "hatchling"]
+dev = ["ruff", "mypy", "black", "twine", "build", "hatchling", "bump"]
 
 [project.urls]
 "Homepage" = "https://github.com/jimorie/clicksearch"
