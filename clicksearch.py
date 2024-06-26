@@ -918,16 +918,16 @@ class FieldBase(click.ParamType):
 
     def format_null(self) -> str | None:
         """Return a string representation of a `None` value, if any."""
-        return None
+        return f"No {self.realname}"
 
     def format_brief(self, value: Any, show: bool = False) -> str:
         """
         Return a brief formatted version of `value` for this field. If `show`
         is `True`, the field was explicitly requested to be displayed.
         """
-        value = self.format_value(value)
         if value is None:
-            return ""
+            return self.format_null()
+        value = self.format_value(value)
         if self.brief_format:
             value = self.brief_format.format(name=self.realname, value=value)
         return value
@@ -939,8 +939,6 @@ class FieldBase(click.ParamType):
         displayed.
         """
         value = self.format_value(value)
-        if value is None:
-            return ""
         if self.unlabeled is True:
             return value
         return f"{self.realname}: {value}"
@@ -1087,12 +1085,6 @@ class Number(FieldBase):
         if value is None:
             return False
         return arg(value)
-
-    def format_brief(self, value: Any, show: bool = False) -> str:
-        """Returns a brief formatted version of `value` for this field."""
-        if value is None:
-            return ""
-        return super().format_brief(value, show=show)
 
 
 class Count(Number):
