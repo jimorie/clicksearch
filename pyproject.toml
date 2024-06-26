@@ -1,6 +1,6 @@
 [project]
 name = "clicksearch"
-version = "0.3.1"
+version = "0.3.2"
 description = "Framework for CLI applications that filter data streams"
 readme = "README.md"
 requires-python = ">=3.9"
