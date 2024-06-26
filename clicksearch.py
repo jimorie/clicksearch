@@ -426,8 +426,29 @@ class ModelBase:
         # Sort the items
         items = cls.sort_items(items, options)
 
+        # Collect the fields we are interested in printing
+        if options["show"] and cls._fields[cls]:
+            title_field, *_ = cls._fields[cls].values()
+            if title_field in options["show"]:
+                show_fields = options["show"]
+            else:
+                show_fields = [title_field, *options["show"]]
+            show_explicit = True
+        else:
+            show_fields = list(cls.collect_visible_fields(options))
+            show_explicit = False
+
         # Adjust verbose based on numer of items found
         items = cls.adjust_verbose(items, options)
+
+        # Prefer verbose output if any explicit field is not meant for brief
+        if (
+            show_explicit
+            and options["verbose"] == 0
+            and not options["brief"]
+            and any(field.verbosity for field in show_fields)
+        ):
+            options["verbose"] = 1
 
         # Set print_func based on verbosity
         if options["verbose"] < 0:
@@ -443,18 +464,6 @@ class ModelBase:
         if options["group"]:
             group_fields = options["group"]
             current_group = []
-
-        # Collect the fields we are interested in printing
-        if options["show"] and cls._fields[cls]:
-            title_field, *_ = cls._fields[cls].values()
-            if title_field in options["show"]:
-                show_fields = options["show"]
-            else:
-                show_fields = [title_field, *options["show"]]
-            show_explicit = True
-        else:
-            show_fields = list(cls.collect_visible_fields(options))
-            show_explicit = False
 
         # Set up counter
         item_count = 0
@@ -627,7 +636,9 @@ class ModelBase:
             yield field
 
     @classmethod
-    def print_brief(cls, fields: list[FieldBase], item: Mapping, options: dict, show: bool = False):
+    def print_brief(
+        cls, fields: list[FieldBase], item: Mapping, options: dict, show: bool = False
+    ):
         """Prints a one-line representation of `item`."""
         first = True
         for field in fields:
@@ -653,7 +664,9 @@ class ModelBase:
         click.echo()
 
     @classmethod
-    def print_long(cls, fields: list[FieldBase], item: Mapping, options: dict, show: bool = False):
+    def print_long(
+        cls, fields: list[FieldBase], item: Mapping, options: dict, show: bool = False
+    ):
         """Prints a multi-line representation of `item`."""
         for field in fields:
             try:
