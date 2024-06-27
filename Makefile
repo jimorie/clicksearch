@@ -11,13 +11,16 @@ dist: venv
 	${VENV_DIR}/bin/python -m build --no-isolation -o dist .
 
 patch: venv
-	VERSION=$$(${VENV_DIR}/bin/bump --patch --reset ${VERSION_SRC}); git add -u; git commit -m"Version $${VERSION}"; git tag "v$${VERSION}"
+	@VERSION=$$(${VENV_DIR}/bin/bump --patch --reset ${VERSION_SRC}); git add -u && git commit -m"Version $${VERSION}" && git tag "v$${VERSION}"
 
 minor: venv
-	VERSION=$$(${VENV_DIR}/bin/bump --minor --reset ${VERSION_SRC}); git add -u; git commit -m"Version $${VERSION}"; git tag "v$${VERSION}"
+	@VERSION=$$(${VENV_DIR}/bin/bump --minor --reset ${VERSION_SRC}); git add -u && git commit -m"Version $${VERSION}" && git tag "v$${VERSION}"
 
 major: venv
-	VERSION=$$(${VENV_DIR}/bin/bump --major --reset ${VERSION_SRC}); git add -u; git commit -m"Version $${VERSION}"; git tag "v$${VERSION}"
+	@VERSION=$$(${VENV_DIR}/bin/bump --major --reset ${VERSION_SRC}); git add -u && git commit -m"Version $${VERSION}" && git tag "v$${VERSION}"
+
+clean-tags:
+	git tag --no-merged master | grep -e '^v[0-9]' | xargs git tag -d
 
 clean:
 	rm -rf build
