@@ -448,12 +448,14 @@ class ModelBase:
             options["verbose"] = 1
 
         # Set print_func based on verbosity
+        print_long = cls.print_long
+        print_brief = cls.print_brief
         if options["verbose"] < 0:
             print_func = None
         elif options["long"] or (options["verbose"] and not options["brief"]):
-            print_func = cls.print_long
+            print_func = print_long
         else:
-            print_func = cls.print_brief
+            print_func = print_brief
 
         # Set up info for print group headers
         current_group: list[Any] | None = None
@@ -483,7 +485,7 @@ class ModelBase:
             if group_fields:
                 next_group = [field.fetch(item, None) for field in group_fields]
                 if current_group != next_group:
-                    if current_group and not options["verbose"]:
+                    if current_group and print_func is print_brief:
                         click.echo()
                     header = " | ".join(
                         click.unstyle(field.format_brief(value, show=True))
@@ -497,7 +499,7 @@ class ModelBase:
             print_func(show_fields, item, options, show=show_explicit)
 
         # Print breakdown counts
-        if print_func is cls.print_brief:
+        if print_func is print_brief:
             click.echo()
         cls.print_counts(counts, item_count)
 
