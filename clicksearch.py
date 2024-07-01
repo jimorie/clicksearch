@@ -410,9 +410,6 @@ class ModelBase:
     def main(cls, ctx: ClickSearchContext, **options: Any):
         """Main program flow used by the CLI."""
 
-        # Add on any implied filters
-        cls.preprocess_implied(ctx, options)
-
         # Pre-process all the options
         cls.preprocess_fieldfilterargs(ctx.fieldfilterargs, options)
 
@@ -426,6 +423,9 @@ class ModelBase:
         # Sort the items
         items = cls.sort_items(items, options)
 
+        # Adjust verbose based on numer of items found
+        items = cls.adjust_verbose(items, options)
+
         # Collect the fields we are interested in printing
         if options["show"] and cls._fields[cls]:
             title_field, *_ = cls._fields[cls].values()
@@ -437,9 +437,6 @@ class ModelBase:
         else:
             show_fields = list(cls.collect_visible_fields(options))
             show_explicit = False
-
-        # Adjust verbose based on numer of items found
-        items = cls.adjust_verbose(items, options)
 
         # Prefer verbose output if any explicit field is not meant for brief
         if (
@@ -500,7 +497,7 @@ class ModelBase:
             print_func(show_fields, item, options, show=show_explicit)
 
         # Print breakdown counts
-        if options["verbose"] == 0:
+        if print_func is cls.print_brief:
             click.echo()
         cls.print_counts(counts, item_count)
 
@@ -523,40 +520,30 @@ class ModelBase:
                 ]
 
     @classmethod
-    def preprocess_implied(cls, ctx: ClickSearchContext, options: dict):
-        """
-        Add all "implied" filters for referenced fields to
-        `ctx.fieldfilterargs`.
-        """
-        fields = set(ctx.fieldfilterargs)
-        fields.update(options["count"])
-        fields.update(options["sort"])
-        fields.update(options["group"])
-        fields.update(options["show"])
-        for field in fields:
-            if field.implied:
-                # Parse the implied filter
-                parsed, _, params = ctx.command.parser.parse_args(  # type: ignore
-                    shlex.split(field.implied)
-                )
-                # Find the implied ClickSearchOption
-                for paramname, filterargs in parsed.items():
-                    if filterargs:
-                        for param in params:
-                            if param.name == paramname:
-                                # Check that the implied field is not filtered on
-                                if param.field not in ctx.fieldfilterargs:
-                                    param.process_value(ctx, filterargs)
-                                break
-
-    @classmethod
     def filter_items(
         cls, ctx: ClickSearchContext, items: Iterable[Mapping], options: dict
     ) -> Iterable[Mapping]:
-        """Yields the items that pass `cls.test_item`."""
+        """
+        Yields the items that pass `cls.test_item` and has all the fields
+        referenced by various display options.
+        """
+        ref_fields = set(
+            itertools.chain(
+                options["count"],
+                options["sort"],
+                options["group"],
+                options["show"],
+            )
+        )
         for item in items:
             if cls.test_item(ctx, item, options):
-                yield item
+                for field in ref_fields:
+                    try:
+                        field.fetch(item)
+                    except MissingField:
+                        break
+                else:
+                    yield item
 
     @classmethod
     def test_item(cls, ctx: ClickSearchContext, item: Mapping, options: dict) -> bool:
@@ -568,17 +555,17 @@ class ModelBase:
         for field, filteropts in ctx.fieldfilterargs.items():
             try:
                 value = field.fetch(item)
-            except MissingField:
-                return False
-            any_or_all = any if field.inclusive or field in options["or"] else all
-            result = any_or_all(
-                any_or_all(
-                    filteropt.func(field, filterarg, value, options)
-                    for filterarg in filterargs
+                any_or_all = any if field.inclusive or field in options["or"] else all
+                result = any_or_all(
+                    any_or_all(
+                        filteropt.func(field, filterarg, value, options)
+                        for filterarg in filterargs
+                    )
+                    for filteropt, filterargs in filteropts.items()
+                    if filteropt.func
                 )
-                for filteropt, filterargs in filteropts.items()
-                if filteropt.func
-            )
+            except MissingField:
+                result = False
             if result is inclusive:
                 return result
         return not inclusive
@@ -630,8 +617,9 @@ class ModelBase:
     @classmethod
     def collect_visible_fields(cls, options):
         """Yields all fields that should be considered for printing."""
+        verbose = options["verbose"]
         for field in cls.resolve_fields():
-            if field.verbosity is None or options["verbose"] < field.verbosity:
+            if field.verbosity is None or verbose < field.verbosity:
                 continue
             yield field
 
@@ -773,7 +761,6 @@ class FieldBase(click.ParamType):
         verbosity: int | None = 0,
         unlabeled: bool | object = Undefined,
         brief_format: str | None = None,
-        implied: str | None = None,
         styles: dict | None = None,
         redirect_args: bool = False,
         prefetch: Callable | None = None,
@@ -790,7 +777,6 @@ class FieldBase(click.ParamType):
         self.verbosity = verbosity
         self.unlabeled = unlabeled
         self.brief_format = brief_format
-        self.implied = implied
         self.styles = styles
         self.redirect_args = redirect_args
         self.prefetch = prefetch

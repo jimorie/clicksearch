@@ -242,9 +242,8 @@ The `--show` option can be used to control what fields to display.
 Alice Anderson: Female. Salary 4200.
 Bob Balderson: Male. Salary 2700.
 Charlotte Carlson: Female. Salary 2200.
-Totoro:
 
-Total count: 4
+Total count: 3
 ```
 
 ```pycon
@@ -261,10 +260,7 @@ Charlotte Carlson
 Salary: 2200
 Title: Sales Representative
 
-Totoro
-Title: Company Mascot
-
-Total count: 4
+Total count: 3
 ```
 
 ### `--case`
@@ -389,22 +385,20 @@ The `--sort` option controls the order in which resulting items are displayed.
 
 ```pycon
 >>> Employee.cli('--sort salary', reader=employees)
-Totoro: Company Mascot.
 Charlotte Carlson: Sales Representative. Female. Salary 2200.
 Bob Balderson: Sales Representative. Male. Salary 2700.
 Alice Anderson: Sales Director. Female. Salary 4200.
 
-Total count: 4
+Total count: 3
 ```
 
 ```pycon
 >>> Employee.cli('--sort gender', reader=employees)
-Totoro: Company Mascot.
 Alice Anderson: Sales Director. Female. Salary 4200.
 Charlotte Carlson: Sales Representative. Female. Salary 2200.
 Bob Balderson: Sales Representative. Male. Salary 2700.
 
-Total count: 4
+Total count: 3
 ```
 
 ### `--desc`
@@ -416,9 +410,8 @@ The `--desc` option switches the `--sort` and `--group` options to use descendin
 Alice Anderson: Sales Director. Female. Salary 4200.
 Bob Balderson: Sales Representative. Male. Salary 2700.
 Charlotte Carlson: Sales Representative. Female. Salary 2200.
-Totoro: Company Mascot.
 
-Total count: 4
+Total count: 3
 ```
 
 ### `--group`
@@ -1165,92 +1158,6 @@ Name: Pascal
 Total count: 2
 ```
 
-#### `implied`
-
-A string specifying a set of default filters to apply when this field is used. The syntax for this string is the same as if the options were given on the command line. The implied filters are only applied if the targeted field does not have any filters set.
-
-```python
-class Species(ModelBase):
-    name = Text()
-    animal_type = Choice(
-        ['Mammal', 'Fish', 'Bird', 'Reptile', 'Amphibian'],
-        keyname="type",
-        optname="type",
-        realname="Type",
-        inclusive=True,
-    )
-    gestation_period = Number(
-        implied="--type Mammal",
-        optname="gp",
-    )
-
-def species(options: dict):
-    yield {'name': 'Human', 'type': 'Mammal', 'gestation_period': 280}
-    yield {'name': 'Cat', 'type': 'Mammal', 'gestation_period': 65}
-    yield {'name': 'Eagle', 'type': 'Bird', 'gestation_period': 0}
-    yield {'name': 'Toad', 'type': 'Amphibian'}
-```
-
-The "Eagle" and the "Toad" are excluded from the output because the `--gp` option implies `--type Mammal`:
-
-
-```pycon
->>> Species.cli('--gp "<100"', reader=species)
-Cat
-Type: Mammal
-Gestation Period: 65
-
-Total count: 1
-```
-
-```pycon
->>> Species.cli('--sort "gestation period"', reader=species)
-Cat: Mammal. Gestation Period 65.
-Human: Mammal. Gestation Period 280.
-
-Total count: 2
-```
-
-```pycon
->>> Species.cli('--group "gestation period"', reader=species)
-[ Gestation Period 65 ]
-Cat: Mammal. Gestation Period 65.
-
-[ Gestation Period 280 ]
-Human: Mammal. Gestation Period 280.
-
-Total count: 2
-```
-
-```pycon
->>> Species.cli('--show "gestation period"', reader=species)
-Human: Gestation Period 280.
-Cat: Gestation Period 65.
-
-Total count: 2
-```
-
-```pycon
->>> Species.cli('--count "gestation period"', reader=species)
-
-[ Gestation Period counts ]
-
-Gestation Period 280: 1
-Gestation Period 65:  1
-
-Total count: 2
-```
-
-If `animal_type` is explicitly filtered then the implied `--type` is ignored:
-
-```pycon
->>> Species.cli('--sort "gestation period" --type-isnt Mammal', reader=species)
-Toad: Amphibian.
-Eagle: Bird. Gestation Period 0.
-
-Total count: 2
-```
-
 #### `redirect_args`
 
 Set to `True` to redirect all positional arguments to the **first** filter option for this field.
@@ -1303,3 +1210,91 @@ Total count: 4
 #### `styles`
 
 Set the styles with which to display values of this field, as passed on to [click.style](https://click.palletsprojects.com/en/latest/api/#click.style).
+
+## More Examples
+
+### Missing Fields
+
+If a field that is referenced by a filter or other option is missing on an item, that item will be excluded from the results.
+
+```python
+class Species(ModelBase):
+    name = Text()
+    animal_type = Choice(
+        ['Mammal', 'Fish', 'Bird', 'Reptile', 'Amphibian'],
+        keyname="type",
+        optname="type",
+        realname="Type",
+        inclusive=True,
+    )
+    gestation_period = Number(optname="gp")
+
+def species(options: dict):
+    yield {'name': 'Human', 'type': 'Mammal', 'gestation_period': 280}
+    yield {'name': 'Cat', 'type': 'Mammal', 'gestation_period': 65}
+    yield {'name': 'Eagle', 'type': 'Bird', 'gestation_period': ''}
+    yield {'name': 'Toad', 'type': 'Amphibian'}
+```
+
+The "Eagle" and the "Toad" are excluded from the output because the they do not provide a value for the `gestation_period` field:
+
+```pycon
+>>> Species.cli('--gp "<100"', reader=species)
+Cat
+Type: Mammal
+Gestation Period: 65
+
+Total count: 1
+```
+
+```pycon
+>>> Species.cli('--sort "gestation period"', reader=species)
+Cat: Mammal. Gestation Period 65.
+Human: Mammal. Gestation Period 280.
+
+Total count: 2
+```
+
+```pycon
+>>> Species.cli('--group "gestation period"', reader=species)
+[ Gestation Period 65 ]
+Cat: Mammal. Gestation Period 65.
+
+[ Gestation Period 280 ]
+Human: Mammal. Gestation Period 280.
+
+Total count: 2
+```
+
+```pycon
+>>> Species.cli('--show "gestation period"', reader=species)
+Human: Gestation Period 280.
+Cat: Gestation Period 65.
+
+Total count: 2
+```
+
+```pycon
+>>> Species.cli('--count "gestation period"', reader=species)
+
+[ Gestation Period counts ]
+
+Gestation Period 280: 1
+Gestation Period 65:  1
+
+Total count: 2
+```
+
+```pycon
+>>> Species.cli('--type-isnt Mammal', reader=species)
+Eagle: Bird.
+Toad: Amphibian.
+
+Total count: 2
+```
+
+```pycon
+>>> Species.cli('--sort "gestation period" --type-isnt Mammal', reader=species)
+
+Total count: 0
+```
