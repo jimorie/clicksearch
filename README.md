@@ -1205,7 +1205,7 @@ class Species(ModelBase):
 def species(options: dict):
     yield {'name': 'Human', 'type': 'Mammal', 'gestation_period': 280}
     yield {'name': 'Cat', 'type': 'Mammal', 'gestation_period': 65}
-    yield {'name': 'Eagle', 'type': 'Bird', 'gestation_period': ''}
+    yield {'name': 'Eagle', 'type': 'Bird', 'gestation_period': None}
     yield {'name': 'Toad', 'type': 'Amphibian'}
 ```
 

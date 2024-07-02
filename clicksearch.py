@@ -895,7 +895,7 @@ class FieldBase(click.ParamType):
         Return `True` if the value of this field indicates that it is infact
         missing, otherwise return `False`.
         """
-        return value is None or value == ""
+        return value is None
 
     def sortkey(self, item: Mapping) -> Any:
         """
