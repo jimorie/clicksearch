@@ -529,17 +529,19 @@ class ModelBase:
         Yields the items that pass `cls.test_item` and has all the fields
         referenced by various display options.
         """
-        ref_fields = set(
-            itertools.chain(
+        autofilter_fields = set(
+            field
+            for field in itertools.chain(
                 options["count"],
                 options["sort"],
                 options["group"],
                 options["show"],
             )
+            if field.autofilter
         )
         for item in items:
             if cls.test_item(ctx, item, options):
-                for field in ref_fields:
+                for field in autofilter_fields:
                     try:
                         field.fetch(item)
                     except MissingField:
@@ -765,6 +767,7 @@ class FieldBase(click.ParamType):
         brief_format: str | None = None,
         styles: dict | None = None,
         redirect_args: bool = False,
+        autofilter: bool = False,
     ):
         self.default = default
         self.inclusive = inclusive
@@ -780,6 +783,7 @@ class FieldBase(click.ParamType):
         self.brief_format = brief_format
         self.styles = styles
         self.redirect_args = redirect_args
+        self.autofilter = autofilter
 
         # Set when assigned to a model
         self.model: type[ModelBase] = None  # type: ignore

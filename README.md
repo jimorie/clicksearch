@@ -137,8 +137,8 @@ To examplify the different use cases, the following model and reader will be use
 class Employee(ModelBase):
     name = Text()
     title = Text()
-    gender = Choice(["Female", "Male", "Other"])
-    salary = Number()
+    gender = Choice(["Female", "Male", "Other"], autofilter=True)
+    salary = Number(autofilter=True)
 
 
 def employees(options: dict):
@@ -1180,15 +1180,9 @@ Salary: 2700
 Total count: 1
 ```
 
-#### `styles`
+#### `autofilter`
 
-Set the styles with which to display values of this field, as passed on to [click.style](https://click.palletsprojects.com/en/latest/api/#click.style).
-
-## More Examples
-
-### Missing Fields
-
-If a field that is referenced by a filter or other option is missing on an item, that item will be excluded from the results.
+Set to `True` to automatically exclude all items where this field is missing, when this field is referenced by any option (e.g. `--sort`, `--count`, `--show`).
 
 ```python
 class Species(ModelBase):
@@ -1200,7 +1194,7 @@ class Species(ModelBase):
         realname="Type",
         inclusive=True,
     )
-    gestation_period = Number(optname="gp")
+    gestation_period = Number(optname="gp", autofilter=True)
 
 def species(options: dict):
     yield {'name': 'Human', 'type': 'Mammal', 'gestation_period': 280}
@@ -1271,3 +1265,7 @@ Total count: 2
 
 Total count: 0
 ```
+
+#### `styles`
+
+Set the styles with which to display values of this field, as passed on to [click.style](https://click.palletsprojects.com/en/latest/api/#click.style).
