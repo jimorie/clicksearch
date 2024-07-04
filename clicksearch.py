@@ -131,6 +131,7 @@ class ClickSearchContext(click.Context):
         self.fieldfilterargs: dict[
             FieldBase, dict[ClickSearchOption, Sequence[Any]]
         ] = collections.defaultdict(dict)
+        self.autofilter_fields = None
 
 
 class ClickSearchCommand(click.Command):
@@ -413,6 +414,18 @@ class ModelBase:
         # Pre-process all the options
         cls.preprocess_fieldfilterargs(ctx.fieldfilterargs, options)
 
+        # Collect all referenced `autofilter` fields.
+        ctx.autofilter_fields = set(
+            field
+            for field in itertools.chain(
+                options["count"],
+                options["sort"],
+                options["group"],
+                options["show"],
+            )
+            if field.autofilter
+        )
+
         # Set up an iterable over all the items
         if isinstance(ctx.command, ClickSearchCommand):
             items = ctx.command.reader(options)
@@ -526,22 +539,13 @@ class ModelBase:
         cls, ctx: ClickSearchContext, items: Iterable[Mapping], options: dict
     ) -> Iterable[Mapping]:
         """
-        Yields the items that pass `cls.test_item` and has all the fields
-        referenced by various display options.
+        Yields the items that pass `cls.test_item` and has valid
+        values for all the fields referenced by
+        `ctx.autofilter_fields`.
         """
-        autofilter_fields = set(
-            field
-            for field in itertools.chain(
-                options["count"],
-                options["sort"],
-                options["group"],
-                options["show"],
-            )
-            if field.autofilter
-        )
         for item in items:
             if cls.test_item(ctx, item, options):
-                for field in autofilter_fields:
+                for field in ctx.autofilter_fields:
                     try:
                         field.fetch(item)
                     except MissingField:
