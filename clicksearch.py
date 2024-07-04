@@ -666,6 +666,8 @@ class ModelBase:
             except MissingField:
                 continue
             value = field.format_long(value, show=show)
+            if not value:
+                continue
             click.echo(value)
         click.echo()
 
@@ -913,6 +915,8 @@ class FieldBase(click.ParamType):
 
     def format_value(self, value: Any) -> str | None:
         """Return a string representation of `value`."""
+        if value == "":
+            return value
         if value is None:
             return self.format_null()
         return self.style(str(value))
