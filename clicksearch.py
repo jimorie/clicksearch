@@ -4,6 +4,7 @@ import collections
 import inspect
 import itertools
 import json
+import math
 import operator
 import re
 import shlex
@@ -1019,8 +1020,9 @@ class Number(FieldBase):
         """
         return (
             "A number optionally prefixed by one of the supported comparison "
-            f"operators: {', '.join(op[0] for op in self.operators)}. With "
-            "== being the default if only a number is given."
+            f"operators: {', '.join(op[0] for op in self.operators)}. Or a "
+            "range of two numbers separated with the .. operator. With == "
+            "being the default operator if none is given."
         )
 
     def convert(
@@ -1031,10 +1033,29 @@ class Number(FieldBase):
     ) -> Any:
         """
         Converts `filterarg` to a function that implements the comparison. If
-        `filterarg` is just a legal value, the default comparison is
-        equality.
+        `filterarg` is just a legal value, the default comparison is equality.
         """
         filterarg = filterarg.strip()
+
+        # Try the range operator first
+        if ".." in filterarg:
+            leftarg, rightarg = filterarg.split("..")
+            leftarg = super(Number, self).convert(leftarg, param, ctx)
+            rightarg = super(Number, self).convert(rightarg, param, ctx)
+            if leftarg is None:
+                leftarg = -math.inf
+            if rightarg is None:
+                rightarg = math.inf
+
+            def compare_range(value):
+                try:
+                    return leftarg <= value <= rightarg
+                except TypeError:
+                    return False
+
+            return compare_range
+
+        # Then all the prefix ones
         for operator_prefix, op in self.operators:
             if filterarg.startswith(operator_prefix):
                 filterarg = filterarg[len(operator_prefix) :].lstrip()

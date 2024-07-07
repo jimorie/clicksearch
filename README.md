@@ -50,9 +50,10 @@ Field filters:
 
 Where:
   FIELD   One of: age, name.
-  NUMBER  A number optionally prefixed by one of the supported comparison
-          operators: ==, =, !=, !, <=, <, >=, >. With == being the default if
-          only a number is given.
+  NUMBER  A number optionally prefixed by one of the supported
+          comparison operators: ==, =, !=, !, <=, <, >=, >. Or a
+          range of two numbers separated with the .. operator.
+          With == being the default operator if none is given.
   TEXT    A text partially matching the field value. The --case, --regex and
           --exact options can be applied. If prefixed with ! the match is
           negated.
@@ -489,6 +490,14 @@ Alice Anderson
 Age: 42
 
 Total count: 1
+```
+
+```pycon
+>>> Person.cli('--age "25..50"', reader=people)
+Alice Anderson: Age 42.
+Bob Balderson: Age 27.
+
+Total count: 2
 ```
 
 ```pycon
