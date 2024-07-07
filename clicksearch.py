@@ -7,7 +7,6 @@ import json
 import math
 import operator
 import re
-import shlex
 import typing
 
 import click
@@ -132,7 +131,7 @@ class ClickSearchContext(click.Context):
         self.fieldfilterargs: dict[
             FieldBase, dict[ClickSearchOption, Sequence[Any]]
         ] = collections.defaultdict(dict)
-        self.autofilter_fields = None
+        self.autofilter_fields: set = set()
 
 
 class ClickSearchCommand(click.Command):
@@ -926,7 +925,7 @@ class FieldBase(click.ParamType):
             return self.format_null()
         return self.style(str(value))
 
-    def format_null(self) -> str | None:
+    def format_null(self) -> str:
         """Return a string representation of a `None` value, if any."""
         return f"No {self.realname}"
 
